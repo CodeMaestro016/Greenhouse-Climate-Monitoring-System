@@ -8,6 +8,7 @@ app.use(express.json());
 connectDB();
 
 app.use("/api/sensors", require("./routes/sensorRoutes"));
+app.use("/api/analysis", require("./routes/analysisRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
