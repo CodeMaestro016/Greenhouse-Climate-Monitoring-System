@@ -8,49 +8,51 @@ interface DashboardPageProps {
 
 function SensorCard({ icon: Icon, name, value, unit, status, trend, change, trendData, color }: any) {
   const colorClasses = {
-    red: 'bg-red-50 text-red-600 border-red-200',
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200'
+    red: 'bg-gradient-to-br from-red-100 to-red-50 text-red-600 border-red-200',
+    blue: 'bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600 border-blue-200',
+    green: 'bg-gradient-to-br from-green-100 to-green-50 text-green-600 border-green-200',
+    yellow: 'bg-gradient-to-br from-yellow-100 to-yellow-50 text-yellow-600 border-yellow-200'
   };
 
   const statusColors = {
-    optimal: 'bg-green-100 text-green-700',
-    warning: 'bg-yellow-100 text-yellow-700',
-    critical: 'bg-red-100 text-red-700'
+    optimal: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md',
+    warning: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-md',
+    critical: 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md'
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all cursor-pointer group">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
+    <div className="greenhouse-card rounded-2xl p-5 hover:scale-105 cursor-pointer group relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-200/20 to-transparent rounded-full -translate-y-10 translate-x-10"></div>
+      
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`p-3 rounded-xl ${colorClasses[color as keyof typeof colorClasses]} shadow-sm group-hover:scale-110 transition-transform duration-200`}>
           <Icon className="w-5 h-5" />
         </div>
-        <span className={`text-sm font-medium px-2 py-1 rounded-full ${statusColors[status as keyof typeof statusColors]}`}>
+        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${statusColors[status as keyof typeof statusColors]} shadow-sm`}>
           {status}
         </span>
       </div>
 
-      <h3 className="text-base font-medium text-gray-600 mb-2">{name}</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-3 relative z-10">{name}</h3>
 
-      <div className="flex items-end justify-between mb-3">
+      <div className="flex items-end justify-between mb-4 relative z-10">
         <div>
-          <span className="text-2xl font-bold text-gray-900">{value}</span>
-          <span className="text-base text-gray-500 ml-1">{unit}</span>
+          <span className="text-3xl font-bold sensor-value">{value}</span>
+          <span className="text-lg text-gray-600 ml-1">{unit}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {trend === 'up' ? (
             <TrendingUp className="w-4 h-4 text-green-600" />
           ) : (
             <TrendingDown className="w-4 h-4 text-red-600" />
           )}
-          <span className={`text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+          <span className={`text-sm font-semibold ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
             {change}
           </span>
         </div>
       </div>
 
-      <div className="h-12">
+      <div className="h-14 relative z-10">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={trendData.map((val: number, idx: number) => ({ value: val, index: idx }))}>
             <Line
@@ -62,7 +64,7 @@ function SensorCard({ icon: Icon, name, value, unit, status, trend, change, tren
                 color === 'green' ? '#10b981' :
                 '#f59e0b'
               }
-              strokeWidth={2}
+              strokeWidth={2.5}
               dot={false}
             />
           </LineChart>
@@ -74,11 +76,11 @@ function SensorCard({ icon: Icon, name, value, unit, status, trend, change, tren
 
 export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) {
   return (
-    <div className="grid grid-cols-12 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
       {/* Left Column - Sensors and Risk Engine */}
-      <div className="col-span-9 space-y-6">
+      <div className="col-span-1 lg:col-span-9 space-y-4 lg:space-y-6">
         {/* Sensor Cards Grid */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <SensorCard
             icon={Thermometer}
             name="Temperature"
@@ -126,30 +128,41 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
         </div>
 
         {/* Smart Risk Engine */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-5">Smart Risk Engine</h2>
+        <div className="greenhouse-card rounded-2xl p-6 nature-shadow">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+              <AlertCircle className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800">Smart Risk Engine</h2>
+          </div>
 
-          <div className="grid grid-cols-[260px_1fr] gap-8 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-center">
             {/* Gauge */}
             <div className="flex items-center justify-center">
-              <div className="relative w-44 h-44">
-                <svg className="w-full h-full -rotate-90">
-                  <circle cx="88" cy="88" r="70" fill="none" stroke="#f3f4f6" strokeWidth="18" />
+              <div className="relative w-48 h-48">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 rounded-full"></div>
+                <svg className="w-full h-full -rotate-90 relative">
+                  <circle cx="96" cy="96" r="75" fill="none" stroke="rgba(34, 197, 94, 0.1)" strokeWidth="20" />
                   <circle
-                    cx="88"
-                    cy="88"
-                    r="70"
+                    cx="96"
+                    cy="96"
+                    r="75"
                     fill="none"
                     stroke={dangerLevel >= 70 ? '#ef4444' : dangerLevel >= 40 ? '#f59e0b' : '#22c55e'}
-                    strokeWidth="18"
-                    strokeDasharray={`${dangerLevel * 4.4} ${440 - dangerLevel * 4.4}`}
+                    strokeWidth="20"
+                    strokeDasharray={`${dangerLevel * 4.7} ${470 - dangerLevel * 4.7}`}
                     strokeLinecap="round"
+                    className="drop-shadow-sm"
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-gray-900">{dangerLevel}%</span>
-                  <span className="text-base text-gray-500 uppercase tracking-wide">Danger Level</span>
-                  <span className="text-sm mt-1 text-amber-700 font-medium">
+                  <span className="text-4xl font-bold sensor-value">{dangerLevel}%</span>
+                  <span className="text-sm text-gray-600 uppercase tracking-wider font-medium">Danger Level</span>
+                  <span className={`text-sm mt-2 px-3 py-1 rounded-full text-white font-semibold text-xs ${
+                    dangerLevel > 70 ? 'bg-gradient-to-r from-red-500 to-rose-600' : 
+                    dangerLevel > 40 ? 'bg-gradient-to-r from-yellow-500 to-amber-600' : 
+                    'bg-gradient-to-r from-green-500 to-emerald-600'
+                  }`}>
                     {dangerLevel > 70 ? 'High Risk' : dangerLevel > 40 ? 'Medium Risk' : 'Low Risk'}
                   </span>
                 </div>
@@ -157,19 +170,26 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
             </div>
 
             {/* Risk Factors */}
-            <div>
-              <h3 className="text-base font-semibold text-gray-700 mb-4">Risk Factors</h3>
+            <div className="space-y-5">
+              <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+                Risk Factors Analysis
+              </h3>
               <div className="space-y-4">
                 {riskFactors.map((factor) => (
-                  <div key={factor.name}>
+                  <div key={factor.name} className="group">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-base text-gray-700">{factor.name}</span>
-                      <span className="text-base font-semibold text-gray-900">{factor.value}%</span>
+                      <span className="text-sm font-medium text-gray-700 group-hover:text-green-700 transition-colors">{factor.name}</span>
+                      <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-lg">{factor.value}%</span>
                     </div>
-                    <div className="h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-3 rounded-full bg-gray-100 overflow-hidden shadow-inner">
                       <div
-                        className="h-full rounded-full"
-                        style={{ width: `${factor.value}%`, backgroundColor: factor.color }}
+                        className="h-full rounded-full transition-all duration-500 ease-out shadow-sm"
+                        style={{ 
+                          width: `${factor.value}%`, 
+                          backgroundColor: factor.color,
+                          boxShadow: `0 0 10px ${factor.color}40`
+                        }}
                       />
                     </div>
                   </div>
@@ -181,16 +201,21 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
       </div>
 
       {/* Right Column - Alerts Panel */}
-      <div className="col-span-3">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-[420px] p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Alerts</h2>
-            <span className="text-sm font-semibold text-red-700 bg-red-100 px-2 py-1 rounded-full">
+      <div className="col-span-1 lg:col-span-3">
+        <div className="greenhouse-card rounded-2xl h-[420px] lg:h-[420px] p-4 lg:p-5 flex flex-col nature-shadow">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg">
+                <AlertCircle className="w-4 h-4 text-white" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-800">Alerts</h2>
+            </div>
+            <span className="text-xs font-bold text-white bg-gradient-to-r from-red-500 to-rose-600 px-3 py-1.5 rounded-full shadow-md">
               {warnings.length} Active
             </span>
           </div>
 
-          <div className="space-y-3 overflow-y-auto pr-1">
+          <div className="space-y-3 overflow-y-auto pr-2 flex-1">
             {warnings.map((warning) => {
               const isHigh = warning.severity === 'high';
               const isMedium = warning.severity === 'medium';
@@ -200,29 +225,41 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
                   type="button"
                   key={warning.id}
                   onClick={() => onOpenAlert?.(warning)}
-                  className={`rounded-lg border p-3 ${
+                  className={`rounded-xl border p-4 transition-all duration-200 hover:scale-102 hover:shadow-md ${
                     isHigh
-                      ? 'border-red-200 bg-red-50'
+                      ? 'border-red-200/50 bg-gradient-to-br from-red-50 to-rose-50 hover:border-red-300/70'
                       : isMedium
-                      ? 'border-amber-200 bg-amber-50'
-                      : 'border-blue-200 bg-blue-50'
-                  } text-left w-full hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400`}
+                      ? 'border-amber-200/50 bg-gradient-to-br from-amber-50 to-yellow-50 hover:border-amber-300/70'
+                      : 'border-blue-200/50 bg-gradient-to-br from-blue-50 to-sky-50 hover:border-blue-300/70'
+                  } text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400 relative overflow-hidden group`}
                 >
-                  <div className="flex items-start gap-2.5">
-                    {isHigh ? (
-                      <XCircle className="w-4 h-4 text-red-600 mt-0.5" />
-                    ) : isMedium ? (
-                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                    )}
-                    <div className="min-w-0">
-                      <p className={`text-sm font-semibold ${isHigh ? 'text-red-700' : isMedium ? 'text-amber-700' : 'text-blue-700'}`}>
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/20 to-transparent rounded-full -translate-y-8 translate-x-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
+                  <div className="flex items-start gap-3 relative z-10">
+                    <div className={`p-2 rounded-lg ${
+                      isHigh 
+                        ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md' 
+                        : isMedium 
+                        ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-md'
+                        : 'bg-gradient-to-br from-blue-500 to-sky-600 text-white shadow-md'
+                    }`}>
+                      {isHigh ? (
+                        <XCircle className="w-4 h-4" />
+                      ) : isMedium ? (
+                        <AlertCircle className="w-4 h-4" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${
+                        isHigh ? 'text-red-700' : isMedium ? 'text-amber-700' : 'text-blue-700'
+                      }`}>
                         {isHigh ? 'Critical' : isMedium ? 'Medium' : 'Low'}
                       </p>
-                      <p className="text-base font-medium text-gray-900 leading-snug mt-0.5">{warning.title}</p>
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{warning.message}</p>
-                      <p className="text-sm text-gray-500 mt-1.5">{warning.time}</p>
+                      <p className="text-sm font-semibold text-gray-900 leading-snug mb-1">{warning.title}</p>
+                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">{warning.message}</p>
+                      <p className="text-xs text-gray-500 font-medium">{warning.time}</p>
                     </div>
                   </div>
                 </button>
