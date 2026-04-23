@@ -2,6 +2,50 @@ const SensorData = require("../models/Sensor");
 const { spawn } = require("child_process");
 const path = require("path");
 
+const FIELD_ALIASES = {
+  light: "lux",
+  mq135_raw: "airppm"
+};
+
+const ALLOWED_FIELDS = [
+  "temperature",
+  "humidity",
+  "light",
+  "lux",
+  "mq135_raw",
+  "airppm",
+  "soil"
+];
+
+function resolveFieldName(field) {
+  return FIELD_ALIASES[field] || field;
+}
+
+function readFieldValue(doc, field) {
+  const resolvedField = resolveFieldName(field);
+  return doc.readings?.[resolvedField];
+}
+
+function detectAnomaliesWithZScore(values, zThreshold = 2.5) {
+  const count = values.length;
+  const mean = values.reduce((sum, value) => sum + value, 0) / count;
+  const variance =
+    values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / count;
+  const stdDev = Math.sqrt(variance);
+
+  if (!Number.isFinite(stdDev) || stdDev === 0) {
+    return values.map((value) => ({ value, isAnomaly: false }));
+  }
+
+  return values.map((value) => {
+    const zScore = Math.abs((value - mean) / stdDev);
+    return {
+      value,
+      isAnomaly: zScore >= zThreshold
+    };
+  });
+}
+
 // Moving average helper
 function calculateMovingAverage(data, windowSize = 5) {
   const result = [];
@@ -59,16 +103,7 @@ const getTrendAnalysis = async (req, res) => {
     const { sensorId } = req.params;
     const { field = "temperature", limit = 100 } = req.query;
 
-    const allowedFields = [
-      "temperature",
-      "humidity",
-      "light",
-      "mq135_raw",
-      "airppm",
-      "soil"
-    ];
-
-    if (!allowedFields.includes(field)) {
+    if (!ALLOWED_FIELDS.includes(field)) {
       return res.status(400).json({
         message: "Invalid field name"
       });
@@ -81,7 +116,7 @@ const getTrendAnalysis = async (req, res) => {
     const data = docs
       .map((doc) => ({
         timestamp: doc.timestamp,
-        value: doc.readings?.[field]
+        value: readFieldValue(doc, field)
       }))
       .filter((item) => item.value !== undefined && item.value !== null);
 
@@ -127,16 +162,7 @@ const getCorrelationAnalysis = async (req, res) => {
       limit = 100
     } = req.query;
 
-    const allowedFields = [
-      "temperature",
-      "humidity",
-      "light",
-      "mq135_raw",
-      "airppm",
-      "soil"
-    ];
-
-    if (!allowedFields.includes(field1) || !allowedFields.includes(field2)) {
+    if (!ALLOWED_FIELDS.includes(field1) || !ALLOWED_FIELDS.includes(field2)) {
       return res.status(400).json({
         message: "Invalid field names"
       });
@@ -148,8 +174,8 @@ const getCorrelationAnalysis = async (req, res) => {
 
     const data = docs
       .map((doc) => ({
-        x: doc.readings?.[field1],
-        y: doc.readings?.[field2]
+        x: readFieldValue(doc, field1),
+        y: readFieldValue(doc, field2)
       }))
       .filter(
         (item) =>
@@ -216,16 +242,7 @@ const getMLAnomalyAnalysis = async (req, res) => {
     const { sensorId } = req.params;
     const { field = "temperature", limit = 100 } = req.query;
 
-    const allowedFields = [
-      "temperature",
-      "humidity",
-      "light",
-      "mq135_raw",
-      "airppm",
-      "soil"
-    ];
-
-    if (!allowedFields.includes(field)) {
+    if (!ALLOWED_FIELDS.includes(field)) {
       return res.status(400).json({ message: "Invalid field name" });
     }
 
@@ -236,7 +253,7 @@ const getMLAnomalyAnalysis = async (req, res) => {
     const data = docs
       .map((doc) => ({
         timestamp: doc.timestamp,
-        value: doc.readings?.[field]
+        value: readFieldValue(doc, field)
       }))
       .filter((item) => item.value !== undefined && item.value !== null);
 
@@ -245,6 +262,26 @@ const getMLAnomalyAnalysis = async (req, res) => {
     }
 
     const values = data.map((item) => Number(item.value));
+    const toResponse = (resultRows, method, fallbackReason) => {
+      const mergedResults = resultRows.map((item, index) => ({
+        timestamp: data[index]?.timestamp,
+        value: item.value,
+        isAnomaly: item.isAnomaly
+      }));
+
+      const anomalies = mergedResults.filter((item) => item.isAnomaly);
+
+      return {
+        sensorId,
+        field,
+        method,
+        count: mergedResults.length,
+        anomalyCount: anomalies.length,
+        results: mergedResults,
+        anomalies,
+        ...(fallbackReason ? { fallbackReason } : {})
+      };
+    };
 
     const pythonScriptPath = path.join(__dirname, "../ml/anomaly_model.py");
 
@@ -267,10 +304,14 @@ const getMLAnomalyAnalysis = async (req, res) => {
       if (hasResponded) return;
       hasResponded = true;
 
-      return res.status(500).json({
-        message: "Failed to start Python process",
-        error: error.message
-      });
+      const fallback = detectAnomaliesWithZScore(values);
+      return res.json(
+        toResponse(
+          fallback,
+          "Z-Score (Fallback)",
+          `Python process failed: ${error.message}`
+        )
+      );
     });
 
     python.stdin.write(JSON.stringify({ values }));
@@ -285,11 +326,17 @@ const getMLAnomalyAnalysis = async (req, res) => {
 
       if (code !== 0) {
         hasResponded = true;
-        return res.status(500).json({
-          message: "Python script execution failed",
-          exitCode: code,
-          error: errorString || "No stderr output"
-        });
+
+        const fallback = detectAnomaliesWithZScore(values);
+        return res.json(
+          toResponse(
+            fallback,
+            "Z-Score (Fallback)",
+            `Python script failed (exit ${code}): ${
+              errorString || "No stderr output"
+            }`
+          )
+        );
       }
 
       try {
@@ -304,31 +351,19 @@ const getMLAnomalyAnalysis = async (req, res) => {
           });
         }
 
-        const mergedResults = result.map((item, index) => ({
-          timestamp: data[index]?.timestamp,
-          value: item.value,
-          isAnomaly: item.isAnomaly
-        }));
-
-        const anomalies = mergedResults.filter((item) => item.isAnomaly);
-
         hasResponded = true;
-        return res.json({
-          sensorId,
-          field,
-          method: "Isolation Forest (ML)",
-          count: mergedResults.length,
-          anomalyCount: anomalies.length,
-          results: mergedResults,
-          anomalies
-        });
+        return res.json(toResponse(result, "Isolation Forest (ML)"));
       } catch (parseError) {
         hasResponded = true;
-        return res.status(500).json({
-          message: "Failed to parse Python output",
-          error: parseError.message,
-          rawOutput: dataString
-        });
+
+        const fallback = detectAnomaliesWithZScore(values);
+        return res.json(
+          toResponse(
+            fallback,
+            "Z-Score (Fallback)",
+            `Failed to parse Python output: ${parseError.message}`
+          )
+        );
       }
     });
   } catch (error) {
