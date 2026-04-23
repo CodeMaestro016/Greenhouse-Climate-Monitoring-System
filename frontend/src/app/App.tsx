@@ -7,7 +7,7 @@
  * - Overall layout structure with header, sidebar, and main content area
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Home, Activity, BarChart3, AlertTriangle, History, Bell, Settings, Sprout, MessageCircle, Bot, Sparkles, Send, X, Minimize2, Maximize2 } from 'lucide-react';
 import { DashboardPage } from './Pages/DashboardPage';
 import { AnalyticsPage } from './Pages/AnalyticsPage';
