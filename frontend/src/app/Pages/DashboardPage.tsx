@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Thermometer, Droplets, Sprout, Sun, Wind, TrendingUp, TrendingDown, XCircle, AlertCircle, CheckCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react'; 
+import { 
+  Thermometer, Droplets, Sprout, Sun, Wind, TrendingUp, 
+  TrendingDown, XCircle, AlertCircle, CheckCircle, Wifi, WifiOff, Activity
+} from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line } from 'recharts';
+import { ForecastView } from './ForecastView';
 
 type SensorStatus = 'optimal' | 'warning' | 'critical';
 
@@ -19,6 +23,7 @@ type SensorRecord = {
   soil?: number;
   lux?: number;
   airppm?: number;
+  sensorId?: string;
 };
 
 type DashboardWarning = {
@@ -29,58 +34,172 @@ type DashboardWarning = {
   time: string;
   action: string;
 };
+
 interface DashboardPageProps {
   dangerLevel: number;
   onOpenAlert: (warning: { title: string; message: string; severity: string }) => void;
 }
 
-function SensorCard({ icon: Icon, name, value, unit, status, trend, change, trendData, color }: any) {
+// Helper function for relative time
+const formatRelativeUpdateTime = (date: Date | null): string => {
+  if (!date) return 'Waiting for first update';
+  
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  
+  if (diffSeconds < 10) return 'Just now';
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  
+  const minutes = Math.floor(diffSeconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m ago` : `${hours}h ago`;
+  }
+  
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+// Temperature messages
+const getTemperatureMessage = (temp: number | null): string => {
+  if (temp === null) return 'No reading';
+  if (temp < 20) return 'Too cold';
+  if (temp <= 22) return 'Slightly cool';
+  if (temp <= 26) return 'Good condition';
+  if (temp <= 28) return 'Slightly warm';
+  return 'Too hot';
+};
+
+// Humidity messages
+const getHumidityMessage = (hum: number | null): string => {
+  if (hum === null) return 'No reading';
+  if (hum < 50) return 'Too dry';
+  if (hum <= 55) return 'Slightly dry';
+  if (hum <= 65) return 'Good condition';
+  if (hum <= 75) return 'Slightly humid';
+  return 'Too humid';
+};
+
+// Soil messages
+const getSoilMessage = (soil: number | null): string => {
+  if (soil === null) return 'No reading';
+  if (soil < 60) return 'Soil is dry';
+  if (soil <= 65) return 'Soil slightly dry';
+  if (soil <= 75) return 'Good condition';
+  if (soil <= 80) return 'Soil slightly wet';
+  return 'Soil too wet';
+};
+
+// Light messages
+const getLightMessage = (light: number | null): string => {
+  if (light === null) return 'No reading';
+  if (light < 8000) return 'Low light';
+  if (light <= 10000) return 'Light slightly low';
+  if (light <= 15000) return 'Good condition';
+  if (light <= 20000) return 'Light slightly strong';
+  return 'Too much light';
+};
+
+// Air quality messages
+const getAirMessage = (air: number | null): string => {
+  if (air === null) return 'No reading';
+  if (air <= 150) return 'Clean air';
+  if (air <= 300) return 'Air needs attention';
+  return 'Bad air';
+};
+
+// Helper function to get status display text with emoji
+const getStatusDisplay = (status: SensorStatus): string => {
+  switch (status) {
+    case 'optimal':
+      return '🟢 Good';
+    case 'warning':
+      return '🟡 Watch';
+    case 'critical':
+      return '🔴 Action needed';
+    default:
+      return '🟢 Good';
+  }
+};
+
+// TimeAgo Component
+const TimeAgo = ({ date, className = '' }: { date: Date | null; className?: string }) => {
+  const [, forceUpdate] = useState({});
+  
+  useEffect(() => {
+    const interval = window.setInterval(() => forceUpdate({}), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  if (!date) return <span className={className}>No data</span>;
+  
+  const isStale = (Date.now() - date.getTime()) > 300000;
+  const timeText = formatRelativeUpdateTime(date);
+  
+  return (
+    <span className={`${className} ${isStale ? 'text-red-500' : 'text-gray-400'}`}>
+      {timeText}
+    </span>
+  );
+};
+
+// SensorCard component
+function SensorCard({ 
+  icon: Icon, 
+  name, 
+  value, 
+  unit, 
+  status, 
+  trendData, 
+  color,
+  lastUpdate,
+  message
+}: any) {
   const colorClasses = {
     red: 'bg-red-50 text-red-600 border-red-200',
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
     green: 'bg-green-50 text-green-600 border-green-200',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200'
+    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
+    violet: 'bg-violet-50 text-violet-600 border-violet-200'
   };
 
-  const statusColors = {
-    optimal: 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md',
-    warning: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-md',
-    critical: 'bg-gradient-to-r from-red-500 to-rose-600 text-white shadow-md'
+  const getStatusBadgeClass = (status: string) => {
+    if (status === 'optimal') return 'bg-green-100 text-green-700';
+    if (status === 'warning') return 'bg-yellow-100 text-yellow-700';
+    return 'bg-red-100 text-red-700';
   };
+
+  const messageParts = message.split('\n');
+  const mainMessage = messageParts[0];
+  const actionMessage = messageParts[1];
 
   return (
-    <div className="greenhouse-card rounded-2xl p-5 hover:scale-105 cursor-pointer group relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-green-200/20 to-transparent rounded-full -translate-y-10 translate-x-10"></div>
-      
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div className={`p-3 rounded-xl ${colorClasses[color as keyof typeof colorClasses]} shadow-sm group-hover:scale-110 transition-transform duration-200`}>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all cursor-pointer group flex flex-col h-full">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
           <Icon className="w-5 h-5" />
         </div>
-        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${statusColors[status as keyof typeof statusColors]} shadow-sm`}>
-          {status}
+        <span className={`text-sm font-medium px-2 py-1 rounded-full ${getStatusBadgeClass(status)}`}>
+          {getStatusDisplay(status)}
         </span>
       </div>
 
-      <h3 className="text-sm font-semibold text-gray-700 mb-3 relative z-10">{name}</h3>
+      <h3 className="text-base font-medium text-gray-600 mb-2">{name}</h3>
 
-      <div className="flex items-end justify-between mb-4 relative z-10">
+      <div className="flex items-end justify-between mb-1">
         <div>
-          <span className="text-3xl font-bold sensor-value">{value}</span>
-          <span className="text-lg text-gray-600 ml-1">{unit}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {trend === 'up' ? (
-            <TrendingUp className="w-4 h-4 text-green-600" />
-          ) : (
-            <TrendingDown className="w-4 h-4 text-red-600" />
-          )}
-          <span className={`text-sm font-semibold ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-            {change}
-          </span>
+          <span className="text-2xl font-bold text-gray-900">{value}</span>
+          <span className="text-base text-gray-500 ml-1">{unit}</span>
         </div>
       </div>
 
-      <div className="h-14 relative z-10">
+      <div className="mb-2">
+        <TimeAgo date={lastUpdate} className="text-xs" />
+      </div>
+
+      <div className="h-12 mb-3">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={trendData.map((val: number, idx: number) => ({ value: val, index: idx }))}>
             <Line
@@ -93,11 +212,24 @@ function SensorCard({ icon: Icon, name, value, unit, status, trend, change, tren
                 color === 'violet' ? '#7c3aed' :
                 '#f59e0b'
               }
-              strokeWidth={2.5}
+              strokeWidth={2}
               dot={false}
             />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="flex-grow"></div>
+
+      <div className="mt-2 pt-2 border-t border-gray-100">
+        <p className="text-sm font-medium text-gray-700 text-center">
+          {mainMessage}
+        </p>
+        {actionMessage && (
+          <p className="text-xs font-semibold text-emerald-600 text-center mt-1">
+            {actionMessage}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -105,9 +237,22 @@ function SensorCard({ icon: Icon, name, value, unit, status, trend, change, tren
 
 export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) {
   const [dashboardRecords, setDashboardRecords] = useState<SensorRecord[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [currentSensorId, setCurrentSensorId] = useState<string>('GH001');
+  const [coordinates] = useState({ lat: 6.9271, lon: 79.8612 });
+  
+  // Force re-render every second for time-ago updates
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setDashboardRecords(prev => [...prev]);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
+  // Fetch dashboard data
   useEffect(() => {
     let cancelled = false;
+    let retryTimeout: number | undefined;
 
     const fetchDashboardData = async () => {
       try {
@@ -119,23 +264,32 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
         const payload = await response.json();
         if (!cancelled && Array.isArray(payload)) {
           setDashboardRecords(payload);
+          setIsConnected(true);
+          if (payload.length > 0 && payload[0].sensorId) {
+            setCurrentSensorId(payload[0].sensorId);
+          }
         }
-      } catch {
+      } catch (error) {
+        console.error('Error fetching sensor data:', error);
         if (!cancelled) {
+          setIsConnected(false);
           setDashboardRecords([]);
+          retryTimeout = window.setTimeout(fetchDashboardData, 5000);
         }
       }
     };
 
     fetchDashboardData();
-    const timer = window.setInterval(fetchDashboardData, 5000);
+    const interval = window.setInterval(fetchDashboardData, 5000);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      clearInterval(interval);
+      if (retryTimeout) clearTimeout(retryTimeout);
     };
   }, []);
 
+  // Parse and process sensor records
   const parsedRows = useMemo(
     () =>
       dashboardRecords
@@ -151,6 +305,16 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
         .sort((a, b) => a.recordedAt.getTime() - b.recordedAt.getTime()),
     [dashboardRecords]
   );
+
+  // Get latest timestamp for time-ago display
+  const latestTimestamp = useMemo(() => {
+    if (dashboardRecords.length === 0) return null;
+    const timestamps = dashboardRecords
+      .map(rec => rec.timestamp ? new Date(rec.timestamp).getTime() : 0)
+      .filter(t => t > 0);
+    if (timestamps.length === 0) return null;
+    return new Date(Math.max(...timestamps));
+  }, [dashboardRecords]);
 
   const getSeries = (key: 'temperature' | 'humidity' | 'soil' | 'light' | 'airppm') => {
     const values = parsedRows
@@ -173,31 +337,35 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
   const latestLight = lightSeries[lightSeries.length - 1] ?? null;
   const latestAirPpm = airppmSeries[airppmSeries.length - 1] ?? null;
 
-  const getTrendMeta = (series: number[]) => {
-    if (series.length < 2) {
-      return { trend: 'up' as const, change: '+0.0' };
-    }
+  // Get descriptive messages for each sensor
+  const tempMessage = getTemperatureMessage(latestTemp);
+  const humidityMessage = getHumidityMessage(latestHumidity);
+  const soilMessage = getSoilMessage(latestSoil);
+  const lightMessage = getLightMessage(latestLight);
+  const airMessage = getAirMessage(latestAirPpm);
 
-    const prev = series[series.length - 2];
-    const curr = series[series.length - 1];
-    const delta = curr - prev;
-    const trend = delta >= 0 ? 'up' : 'down';
-    const change = `${delta >= 0 ? '+' : ''}${Math.abs(delta)}`;
-
-    return { trend, change };
+  // Temperature status based on ranges
+  const getTempStatus = (v: number): SensorStatus => 
+    (v > 28 || v < 20 ? 'critical' : v > 26 || v < 22 ? 'warning' : 'optimal');
+  
+  // Humidity status based on ranges
+  const getHumidityStatus = (v: number): SensorStatus => 
+    (v > 75 || v < 50 ? 'critical' : v > 65 || v < 55 ? 'warning' : 'optimal');
+  
+  // Soil status based on ranges
+  const getSoilStatus = (v: number): SensorStatus => 
+    (v > 80 || v < 60 ? 'critical' : v > 75 || v < 65 ? 'warning' : 'optimal');
+  
+  // Light status based on ranges
+  const getLightStatus = (v: number): SensorStatus => 
+    (v > 20000 || v < 8000 ? 'critical' : v > 15000 || v < 10000 ? 'warning' : 'optimal');
+  
+  // Air quality status based on 0-150 = GOOD, 151-300 = WARNING, 300+ = CRITICAL
+  const getAirPpmStatus = (v: number): SensorStatus => {
+    if (v <= 150) return 'optimal';
+    if (v <= 300) return 'warning';
+    return 'critical';
   };
-
-  const tempTrend = getTrendMeta(tempSeries);
-  const humidityTrend = getTrendMeta(humiditySeries);
-  const soilTrend = getTrendMeta(soilSeries);
-  const lightTrend = getTrendMeta(lightSeries);
-  const airPpmTrend = getTrendMeta(airppmSeries);
-
-  const getTempStatus = (v: number): SensorStatus => (v > 32 || v < 18 ? 'critical' : v > 30 || v < 20 ? 'warning' : 'optimal');
-  const getHumidityStatus = (v: number): SensorStatus => (v < 55 || v > 90 ? 'critical' : v < 65 || v > 85 ? 'warning' : 'optimal');
-  const getSoilStatus = (v: number): SensorStatus => (v < 40 || v > 85 ? 'critical' : v < 50 || v > 75 ? 'warning' : 'optimal');
-  const getLightStatus = (v: number): SensorStatus => (v < 1500 || v > 40000 ? 'critical' : v < 4000 || v > 30000 ? 'warning' : 'optimal');
-  const getAirPpmStatus = (v: number): SensorStatus => (v < 300 || v > 2000 ? 'critical' : v < 400 || v > 1500 ? 'warning' : 'optimal');
 
   const tempStatus = typeof latestTemp === 'number' ? getTempStatus(latestTemp) : 'warning';
   const humidityStatus = typeof latestHumidity === 'number' ? getHumidityStatus(latestHumidity) : 'warning';
@@ -205,109 +373,71 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
   const lightStatus = typeof latestLight === 'number' ? getLightStatus(latestLight) : 'warning';
   const airPpmStatus = typeof latestAirPpm === 'number' ? getAirPpmStatus(latestAirPpm) : 'warning';
 
-  const calcRisk = (value: number, min: number, max: number) => {
-    if (!Number.isFinite(value)) {
-      return 0;
-    }
-
-    if (value >= min && value <= max) {
-      return 0;
-    }
-
-    const distance = value < min ? min - value : value - max;
-    const spread = Math.max(1, max - min);
-    return Math.max(0, Math.min(100, (distance / spread) * 100));
-  };
-
-  const tempRisk = calcRisk(typeof latestTemp === 'number' ? latestTemp : NaN, 20, 30);
-  const humidityRisk = calcRisk(typeof latestHumidity === 'number' ? latestHumidity : NaN, 65, 85);
-  const soilRisk = calcRisk(typeof latestSoil === 'number' ? latestSoil : NaN, 50, 75);
-  const lightRisk = calcRisk(typeof latestLight === 'number' ? latestLight : NaN, 4000, 30000);
-  const airPpmRisk = calcRisk(typeof latestAirPpm === 'number' ? latestAirPpm : NaN, 400, 1500);
-
-  const liveDangerLevel = (tempRisk + humidityRisk + soilRisk + lightRisk + airPpmRisk) / 5;
-  const currentDanger = Number.isFinite(liveDangerLevel) && parsedRows.length > 0 ? liveDangerLevel : dangerLevel;
-
-  const riskFactors = [
-    { name: 'Soil Moisture', value: soilRisk, color: '#ef4444' },
-    { name: 'Humidity', value: humidityRisk, color: '#f59e0b' },
-    { name: 'Temperature', value: tempRisk, color: '#10b981' },
-    { name: 'Light', value: lightRisk, color: '#3b82f6' },
-    { name: 'Air', value: airPpmRisk, color: '#7c3aed' }
-  ];
+  // Calculate active sensor count
+  const activeSensorCount = [
+    latestTemp, 
+    latestHumidity, 
+    latestSoil, 
+    latestLight, 
+    latestAirPpm
+  ].filter(v => typeof v === 'number' && v !== null).length;
 
   const toWarningSeverity = (status: SensorStatus): DashboardWarning['severity'] => {
-    if (status === 'critical') {
-      return 'high';
-    }
-
-    if (status === 'warning') {
-      return 'medium';
-    }
-
+    if (status === 'critical') return 'high';
+    if (status === 'warning') return 'medium';
     return 'low';
   };
 
   const warnings: DashboardWarning[] = [
     ...(typeof latestSoil === 'number' && soilStatus !== 'optimal'
-      ? [
-          {
-            id: 1,
-            severity: toWarningSeverity(soilStatus),
-            title: soilStatus === 'critical' ? 'Critical Soil Moisture' : 'Soil Moisture Warning',
-            message: `Soil moisture is ${latestSoil}%`,
-            time: 'Live',
-            action: 'Start Irrigation'
-          }
-        ]
+      ? [{
+          id: 1,
+          severity: toWarningSeverity(soilStatus),
+          title: soilStatus === 'critical' ? '💧 Critical Soil Moisture Alert' : '💧 Soil Moisture Warning',
+          message: `Soil moisture is at ${latestSoil}%, which is ${soilMessage.toLowerCase().replace('\n', ' - ')}. Plants need immediate attention.`,
+          time: '10 seconds ago',
+          action: 'Start Irrigation'
+        }]
       : []),
     ...(typeof latestHumidity === 'number' && humidityStatus !== 'optimal'
-      ? [
-          {
-            id: 2,
-            severity: toWarningSeverity(humidityStatus),
-            title: humidityStatus === 'critical' ? 'Critical Humidity' : 'Humidity Warning',
-            message: `Humidity is ${latestHumidity}%`,
-            time: 'Live',
-            action: 'Check Misters'
-          }
-        ]
+      ? [{
+          id: 2,
+          severity: toWarningSeverity(humidityStatus),
+          title: humidityStatus === 'critical' ? '💨 Critical Humidity Alert' : '💨 Humidity Warning',
+          message: `Humidity level is ${latestHumidity}%, ${humidityMessage.toLowerCase().replace('\n', ' - ')}. This affects plant health.`,
+          time: '25 seconds ago',
+          action: 'Check Misters'
+        }]
       : []),
     ...(typeof latestTemp === 'number' && tempStatus !== 'optimal'
-      ? [
-          {
-            id: 3,
-            severity: toWarningSeverity(tempStatus),
-            title: tempStatus === 'critical' ? 'Critical Temperature' : 'Temperature Warning',
-            message: `Temperature is ${latestTemp}°C`,
-            time: 'Live',
-            action: 'Adjust Vents'
-          }
-        ]
+      ? [{
+          id: 3,
+          severity: toWarningSeverity(tempStatus),
+          title: tempStatus === 'critical' ? '🌡️ Critical Temperature Alert' : '🌡️ Temperature Warning',
+          message: `Temperature is ${latestTemp}°C, ${tempMessage.toLowerCase().replace('\n', ' - ')}. Monitor plant stress indicators.`,
+          time: '1 minute ago',
+          action: 'Adjust Vents'
+        }]
       : []),
     ...(typeof latestLight === 'number' && lightStatus !== 'optimal'
-      ? [
-          {
-            id: 4,
-            severity: toWarningSeverity(lightStatus),
-            title: lightStatus === 'critical' ? 'Critical Light Intensity' : 'Light Intensity Warning',
-            message: `Light intensity is ${latestLight} lux`,
-            time: 'Live',
-            action: 'Adjust Shade'
-          }
-        ]
+      ? [{
+          id: 4,
+          severity: toWarningSeverity(lightStatus),
+          title: lightStatus === 'critical' ? '☀️ Critical Light Alert' : '☀️ Light Intensity Warning',
+          message: `Light intensity is ${latestLight} lux, ${lightMessage.toLowerCase().replace('\n', ' - ')}. Plants may not get enough light.`,
+          time: '2 minutes ago',
+          action: 'Adjust Shade'
+        }]
       : []),
     ...(typeof latestAirPpm === 'number' && airPpmStatus !== 'optimal'
-      ? [
-          {
-            id: 5,
-            severity: toWarningSeverity(airPpmStatus),
-            title: airPpmStatus === 'critical' ? 'Critical Air' : 'Air Warning',
-            message: `Air is ${latestAirPpm} ppm`,
-            time: 'Live',
-            action: 'Check Ventilation'
-          }
-        ]
+      ? [{
+          id: 5,
+          severity: toWarningSeverity(airPpmStatus),
+          title: airPpmStatus === 'critical' ? '🌬️ Critical Air Quality Alert' : '🌬️ Air Quality Warning',
+          message: `Air quality is ${latestAirPpm} ppm, ${airMessage.toLowerCase().replace('\n', ' - ')}. Ventilation needed.`,
+          time: '3 minutes ago',
+          action: 'Check Ventilation'
+        }]
       : [])
   ];
 
@@ -319,37 +449,51 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
             ? {
                 id: 99,
                 severity: 'low',
-                title: 'Waiting for Sensor Data',
-                message: 'No live sensor records available yet',
-                time: 'Live',
+                title: !isConnected ? '🔌 Connection Lost' : '⏳ Waiting for Sensor Data',
+                message: !isConnected
+                  ? 'Unable to connect to sensor API. Please check backend service and network connection.'
+                  : 'No live sensor records available yet. System is initializing.',
+                time: 'Just now',
                 action: 'View Details'
               }
             : {
                 id: 100,
                 severity: 'low',
-                title: 'All Sensors Stable',
-                message: 'Current readings are within safe range',
-                time: 'Live',
+                title: '✅ All Systems Stable',
+                message: 'All sensor readings are within the optimal range. Greenhouse conditions are perfect for plant growth.',
+                time: '5 minutes ago',
                 action: 'View Details'
               }
         ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-      {/* Left Column - Sensors and Risk Engine */}
-      <div className="col-span-1 lg:col-span-9 space-y-4 lg:space-y-6">
+    <div className="grid grid-cols-12 gap-6">
+      {/* Connection Status Bar */}
+      {!isConnected && (
+        <div className="col-span-12 mb-2">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-700 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              Connection lost. Retrying...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Left Column - Sensors and Forecast */}
+      <div className="col-span-9 space-y-6">
         {/* Sensor Cards Grid */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-5 gap-4">
           <SensorCard
             icon={Thermometer}
             name="Temperature"
             value={typeof latestTemp === 'number' ? latestTemp : '--'}
             unit="°C"
             status={tempStatus}
-            trend={tempTrend.trend}
-            change={tempTrend.change}
             trendData={tempSeries}
             color="red"
+            lastUpdate={latestTimestamp}
+            message={tempMessage}
           />
           <SensorCard
             icon={Droplets}
@@ -357,10 +501,10 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
             value={typeof latestHumidity === 'number' ? latestHumidity : '--'}
             unit="%"
             status={humidityStatus}
-            trend={humidityTrend.trend}
-            change={humidityTrend.change}
             trendData={humiditySeries}
             color="blue"
+            lastUpdate={latestTimestamp}
+            message={humidityMessage}
           />
           <SensorCard
             icon={Sprout}
@@ -368,10 +512,10 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
             value={typeof latestSoil === 'number' ? latestSoil : '--'}
             unit="%"
             status={soilStatus}
-            trend={soilTrend.trend}
-            change={soilTrend.change}
             trendData={soilSeries}
             color="green"
+            lastUpdate={latestTimestamp}
+            message={soilMessage}
           />
           <SensorCard
             icon={Sun}
@@ -379,105 +523,47 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
             value={typeof latestLight === 'number' ? latestLight : '--'}
             unit="lux"
             status={lightStatus}
-            trend={lightTrend.trend}
-            change={lightTrend.change}
             trendData={lightSeries}
             color="yellow"
+            lastUpdate={latestTimestamp}
+            message={lightMessage}
           />
           <SensorCard
             icon={Wind}
-            name="Air"
+            name="Air Quality"
             value={typeof latestAirPpm === 'number' ? latestAirPpm : '--'}
             unit="ppm"
             status={airPpmStatus}
-            trend={airPpmTrend.trend}
-            change={airPpmTrend.change}
             trendData={airppmSeries}
             color="violet"
+            lastUpdate={latestTimestamp}
+            message={airMessage}
           />
         </div>
 
-        {/* Smart Risk Engine */}
-        <div className="greenhouse-card rounded-2xl p-6 nature-shadow">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
-              <AlertCircle className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-800">Smart Risk Engine</h2>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 items-center">
-            {/* Gauge */}
-            <div className="flex items-center justify-center">
-              <div className="relative w-48 h-48">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 rounded-full"></div>
-                <svg className="w-full h-full -rotate-90 relative">
-                  <circle cx="96" cy="96" r="75" fill="none" stroke="rgba(34, 197, 94, 0.1)" strokeWidth="20" />
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r="75"
-                    fill="none"
-                    stroke={dangerLevel >= 70 ? '#ef4444' : dangerLevel >= 40 ? '#f59e0b' : '#22c55e'}
-                    strokeWidth="18"
-                    strokeDasharray={`${dangerLevel * 4.4} ${440 - dangerLevel * 4.4}`}
-                    strokeLinecap="round"
-                    className="drop-shadow-sm"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold text-gray-900">{dangerLevel}%</span>
-                  <span className="text-base text-gray-500 uppercase tracking-wide">Danger Level</span>
-                  <span className="text-sm mt-1 text-amber-700 font-medium">
-                    {dangerLevel > 70 ? 'High Risk' : dangerLevel > 40 ? 'Medium Risk' : 'Low Risk'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Risk Factors */}
-            <div className="space-y-5">
-              <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-green-600" />
-                Risk Factors Analysis
-              </h3>
-              <div className="space-y-4">
-                {riskFactors.map((factor) => (
-                  <div key={factor.name} className="group">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-base text-gray-700">{factor.name}</span>
-                      <span className="text-base font-semibold text-gray-900">{factor.value}%</span>
-                    </div>
-                    <div className="h-3 rounded-full bg-gray-100 overflow-hidden shadow-inner">
-                      <div
-                        className="h-full rounded-full transition-all duration-500 ease-out shadow-sm"
-                        style={{ 
-                          width: `${factor.value}%`, 
-                          backgroundColor: factor.color,
-                          boxShadow: `0 0 10px ${factor.color}40`
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        {/* Forecast Section - Simplified without duplicate header */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <ForecastView 
+            sensorId={currentSensorId}
+            lat={coordinates.lat}
+            lon={coordinates.lon}
+          />
         </div>
       </div>
 
-      {/* Right Column - Alerts Panel */}
-      <div className="col-span-3">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-[420px] p-4 flex flex-col">
+      {/* Right Column - Alerts and Sensor Status */}
+      <div className="col-span-3 space-y-6">
+        {/* Alerts Panel */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900">Alerts</h2>
             <span className="text-sm font-semibold text-red-700 bg-red-100 px-2 py-1 rounded-full">
-              {warnings.length} Active
+              {fallbackWarnings.length} Active
             </span>
           </div>
 
-          <div className="space-y-3 overflow-y-auto pr-1">
-            {warnings.map((warning) => {
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+            {fallbackWarnings.map((warning) => {
               const isHigh = warning.severity === 'high';
               const isMedium = warning.severity === 'medium';
 
@@ -486,46 +572,86 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
                   type="button"
                   key={warning.id}
                   onClick={() => onOpenAlert?.(warning)}
-                  className={`rounded-xl border p-4 transition-all duration-200 hover:scale-102 hover:shadow-md ${
+                  className={`rounded-lg border p-3 ${
                     isHigh
-                      ? 'border-red-200/50 bg-gradient-to-br from-red-50 to-rose-50 hover:border-red-300/70'
+                      ? 'border-red-200 bg-red-50 hover:bg-red-100'
                       : isMedium
-                      ? 'border-amber-200/50 bg-gradient-to-br from-amber-50 to-yellow-50 hover:border-amber-300/70'
-                      : 'border-blue-200/50 bg-gradient-to-br from-blue-50 to-sky-50 hover:border-blue-300/70'
-                  } text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-400 relative overflow-hidden group`}
+                      ? 'border-amber-200 bg-amber-50 hover:bg-amber-100'
+                      : 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+                  } text-left w-full transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400`}
                 >
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-white/20 to-transparent rounded-full -translate-y-8 translate-x-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  <div className="flex items-start gap-3 relative z-10">
-                    <div className={`p-2 rounded-lg ${
-                      isHigh 
-                        ? 'bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-md' 
-                        : isMedium 
-                        ? 'bg-gradient-to-br from-amber-500 to-yellow-600 text-white shadow-md'
-                        : 'bg-gradient-to-br from-blue-500 to-sky-600 text-white shadow-md'
-                    }`}>
-                      {isHigh ? (
-                        <XCircle className="w-4 h-4" />
-                      ) : isMedium ? (
-                        <AlertCircle className="w-4 h-4" />
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-                    </div>
+                  <div className="flex items-start gap-2.5">
+                    {isHigh ? (
+                      <XCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                    ) : isMedium ? (
+                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    )}
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${
-                        isHigh ? 'text-red-700' : isMedium ? 'text-amber-700' : 'text-blue-700'
-                      }`}>
-                        {isHigh ? 'Critical' : isMedium ? 'Medium' : 'Low'}
-                      </p>
-                      <p className="text-sm font-semibold text-gray-900 leading-snug mb-1">{warning.title}</p>
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">{warning.message}</p>
-                      <p className="text-xs text-gray-500 font-medium">{warning.time}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
+                          isHigh ? 'bg-red-100 text-red-700' : isMedium ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {isHigh ? '🔴 Critical' : isMedium ? '🟡 Warning' : '🔵 Info'}
+                        </p>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                          {warning.title.includes('Soil') ? '💧 Soil' :
+                           warning.title.includes('Humidity') ? '💨 Humidity' :
+                           warning.title.includes('Temperature') ? '🌡️ Temperature' :
+                           warning.title.includes('Light') ? '☀️ Light' :
+                           warning.title.includes('Air') ? '🌬️ Air Quality' : '📊 System'}
+                        </span>
+                      </div>
+                      <p className="text-base font-medium text-gray-900 leading-snug">{warning.title}</p>
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{warning.message}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-gray-400">{warning.time}</p>
+                        <p className="text-xs text-emerald-600 font-medium">{warning.action}</p>
+                      </div>
                     </div>
                   </div>
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Sensor Status Card */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-gray-600" />
+              <h2 className="text-lg font-bold text-gray-900">Sensor Status</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <>
+                  <Wifi className="w-4 h-4 text-emerald-500" />
+                  <span className="text-xs text-emerald-600 font-medium">Live</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-4 h-4 text-red-500" />
+                  <span className="text-xs text-red-600 font-medium">Offline</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Active Sensors Count */}
+          <div className="text-center mb-4 pb-3 border-b border-gray-100">
+            <div className="text-3xl font-bold text-gray-900">{activeSensorCount}/5</div>
+            <p className="text-sm text-gray-500 mt-1">Active Sensors</p>
+          </div>
+          
+          {/* Last Update Footer */}
+          <div className="mt-4 pt-3 border-t border-gray-200">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500">Last update:</span>
+              <TimeAgo date={latestTimestamp} className="text-gray-600 font-medium" />
+            </div>
           </div>
         </div>
       </div>
