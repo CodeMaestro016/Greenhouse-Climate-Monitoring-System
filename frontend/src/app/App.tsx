@@ -2,22 +2,21 @@
  * App.tsx - Main application component for Greenhouse Climate Monitoring System
  * 
  * This is the root component that manages:
- * - Navigation between different pages (Dashboard, Analytics, Live Feed, Alerts, History)
+ * - Navigation between different pages (Dashboard, Analytics, Alerts, History)
  * - AI Assistant chatbot for user interactions
  * - Overall layout structure with header, sidebar, and main content area
  */
 
 import { useState } from 'react';
-import { Home, Activity, BarChart3, AlertTriangle, History, Bell, Settings, Sprout, MessageCircle, Bot, Sparkles, Send, X, Minimize2, Maximize2 } from 'lucide-react';
+import { Home, BarChart3, AlertTriangle, History, Bell, Settings, Sprout, MessageCircle, Bot, Sparkles, Send, X, Minimize2, Maximize2 } from 'lucide-react';
 import { DashboardPage } from './Pages/DashboardPage';
 import { AnalyticsPage } from './Pages/AnalyticsPage';
-import { LiveFeedPage } from './Pages/LiveFeedPage';
 import { AlertsPage } from './Pages/AlertsPage';
 import { HistoryPage } from './Pages/HistoryPage';
 import greenhouseHero from './components/assests/greenhouse-hero.jpg';
 
 // Type definition for available page views
-type ViewType = 'dashboard' | 'analytics' | 'livefeed' | 'alerts' | 'history';
+type ViewType = 'dashboard' | 'analytics' | 'alerts' | 'history';
 
 // Quick question suggestions for AI Assistant - helps users get started with common queries
 const assistantQuickQuestions = [
@@ -78,7 +77,6 @@ function App() {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'livefeed', label: 'Live Feed', icon: Activity },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
     { id: 'history', label: 'History', icon: History },
@@ -88,8 +86,6 @@ function App() {
     switch (currentView) {
       case 'analytics':
         return <AnalyticsPage />;
-      case 'livefeed':
-        return <LiveFeedPage />;
       case 'alerts':
         return <AlertsPage selectedAlertId={selectedAlertId} />;
       case 'history':
@@ -124,7 +120,6 @@ function App() {
               <p className="text-sm text-green-700 font-medium">
                 {currentView === 'dashboard' && 'Climate Control Dashboard'}
                 {currentView === 'analytics' && 'Advanced Analytics'}
-                {currentView === 'livefeed' && 'Live Data Feed'}
                 {currentView === 'alerts' && 'Alerts Management'}
                 {currentView === 'history' && 'Historical Sensor Data'}
               </p>
