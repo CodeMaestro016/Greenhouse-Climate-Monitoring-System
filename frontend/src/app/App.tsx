@@ -14,6 +14,7 @@ import { AnalyticsPage } from './Pages/AnalyticsPage';
 import { LiveFeedPage } from './Pages/LiveFeedPage';
 import { AlertsPage } from './Pages/AlertsPage';
 import { HistoryPage } from './Pages/HistoryPage';
+import greenhouseHero from './components/assests/greenhouse-hero.jpg';
 
 // Type definition for available page views
 type ViewType = 'dashboard' | 'analytics' | 'livefeed' | 'alerts' | 'history';
@@ -99,15 +100,28 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background with greenhouse hero image */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-50/90 via-emerald-50/80 to-lime-50/90"></div>
+        <img 
+          src={greenhouseHero} 
+          alt="Greenhouse Background" 
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-green-100/30 via-transparent to-green-50/20"></div>
+      </div>
+
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+      <header className="relative z-10 glass-morphism border-b border-green-200/20 px-6 py-4 sticky top-0 backdrop-blur-md">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Sprout className="w-8 h-8 text-green-600" />
+            <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+              <Sprout className="w-6 h-6 text-white" />
+            </div>
             <div>
-              <h1 className="font-bold text-xl text-gray-900">Mochiforge Greenhouse Monitor</h1>
-              <p className="text-sm text-gray-500">
+              <h1 className="font-bold text-xl text-gray-800 tracking-tight">Mochiforge Greenhouse Monitor</h1>
+              <p className="text-sm text-green-700 font-medium">
                 {currentView === 'dashboard' && 'Climate Control Dashboard'}
                 {currentView === 'analytics' && 'Advanced Analytics'}
                 {currentView === 'livefeed' && 'Live Data Feed'}
@@ -117,20 +131,20 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-5 h-5 text-gray-600" />
+            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:text-green-800 hover:scale-105">
+              <Bell className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Settings className="w-5 h-5 text-gray-600" />
+            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:text-green-800 hover:scale-105">
+              <Settings className="w-5 h-5" />
             </button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex relative z-10">
         {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] p-4 sticky top-[73px]">
-          <nav className="space-y-1">
+        <aside className="w-64 glass-morphism border-r border-green-200/20 min-h-[calc(100vh-89px)] p-4 sticky top-[89px] backdrop-blur-md hidden lg:block">
+          <nav className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -138,8 +152,10 @@ function App() {
                 <button
                   key={item.id}
                   onClick={() => setCurrentView(item.id as ViewType)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm ${
-                    isActive ? 'bg-green-50 text-green-700' : 'text-gray-600 hover:bg-gray-50'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm ${
+                    isActive 
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg transform scale-105' 
+                      : 'text-green-700 hover:bg-green-100/50 hover:scale-102'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -150,9 +166,37 @@ function App() {
           </nav>
         </aside>
 
+        {/* Mobile Navigation */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism border-t border-green-200/20 backdrop-blur-md">
+          <nav className="flex justify-around py-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentView(item.id as ViewType)}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 text-xs ${
+                    isActive 
+                      ? 'text-green-600 bg-green-100/50' 
+                      : 'text-green-700 hover:bg-green-100/30'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-xs font-medium">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
         {/* Main Content */}
-        <main className="flex-1 p-6">
-          {renderPage()}
+        <main className="flex-1 p-4 lg:p-6 relative pb-20 lg:pb-6">
+          <div className="hero-gradient rounded-2xl p-1 mb-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 lg:p-6">
+              {renderPage()}
+            </div>
+          </div>
         </main>
       </div>
 
