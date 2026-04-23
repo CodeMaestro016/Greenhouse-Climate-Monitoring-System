@@ -7,13 +7,14 @@
  * - Overall layout structure with header, sidebar, and main content area
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, Activity, BarChart3, AlertTriangle, History, Bell, Settings, Sprout, MessageCircle, Bot, Sparkles, Send, X, Minimize2, Maximize2 } from 'lucide-react';
 import { DashboardPage } from './Pages/DashboardPage';
 import { AnalyticsPage } from './Pages/AnalyticsPage';
 import { LiveFeedPage } from './Pages/LiveFeedPage';
 import { AlertsPage } from './Pages/AlertsPage';
 import { HistoryPage } from './Pages/HistoryPage';
+import { chatWithAI, getConversationHistory, getAIStatus, generateSessionId } from '../services/aiAssistantService';
 import greenhouseHero from './components/assests/greenhouse-hero.jpg';
 
 // Type definition for available page views
@@ -41,6 +42,10 @@ function App() {
   const [assistantMessages, setAssistantMessages] = useState([
     { id: 1, role: 'assistant', text: 'I am here to answer greenhouse questions in plain language. Try one of the quick questions below.' }
   ]);
+  const [conversationId, setConversationId] = useState<string>('');
+  const [sessionId] = useState(generateSessionId());
+  const [sensorData, setSensorData] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
 
   const dangerLevel = 62;
 
@@ -61,16 +66,63 @@ function App() {
     return 'I can explain live risks, suggest immediate actions, and summarize trends. Ask about temperature, humidity, irrigation, or safety status.';
   };
 
-  const sendAssistantMessage = (questionText?: string) => {
+  const sendAssistantMessage = async (questionText?: string) => {
     const question = (questionText ?? assistantInput).trim();
     if (!question) return;
+    
+    // Add user message immediately
     setAssistantMessages(prev => [
       ...prev,
-      { id: Date.now(), role: 'user', text: question },
-      { id: Date.now() + 1, role: 'assistant', text: getAssistantReply(question) }
+      { id: Date.now(), role: 'user', text: question }
     ]);
+    
+    // Add loading message
+    const loadingId = Date.now() + 1;
+    setAssistantMessages(prev => [
+      ...prev,
+      { id: loadingId, role: 'assistant', text: 'Thinking...' }
+    ]);
+    
+    try {
+      const response = await chatWithAI(question, conversationId, sessionId);
+      
+      // Update conversation ID if this is a new conversation
+      if (response.conversationId && !conversationId) {
+        setConversationId(response.conversationId);
+      }
+      
+      // Replace loading message with actual response
+      setAssistantMessages(prev => 
+        prev.map(msg => 
+          msg.id === loadingId 
+            ? { ...msg, text: response.response }
+            : msg
+        )
+      );
+    } catch (error) {
+      // Replace loading message with error message
+      setAssistantMessages(prev => 
+        prev.map(msg => 
+          msg.id === loadingId 
+            ? { ...msg, text: 'Sorry, I encountered an error. Please try again.' }
+            : msg
+        )
+      );
+    }
+    
     setAssistantInput('');
   };
+
+  useEffect(() => {
+    if (assistantOpen) {
+      getAIStatus().then(status => {
+        if (status.success) {
+          setSensorData(status.sensorData);
+          setRecommendations(status.recommendations || []);
+        }
+      });
+    }
+  }, [assistantOpen]);
 
   const handleOpenAlert = (warning: { title: string; message: string; severity: string }) => {
     setCurrentView('alerts');
