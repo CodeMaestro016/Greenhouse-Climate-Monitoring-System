@@ -2,7 +2,10 @@ const mongoose = require("mongoose");
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    // Use the MongoDB URI from .env file
+    const mongoUri = 'mongodb+srv://usert0445_db_user:greenhouse@cluster0.8aw4xqx.mongodb.net/greenhouseDB?retryWrites=true&w=majority&appName=Cluster0';
+    console.log('Connecting to MongoDB...');
+    await mongoose.connect(mongoUri);
     console.log("MongoDB Connected");
   } catch (error) {
     console.error("MongoDB Connection Error:", error.message);
