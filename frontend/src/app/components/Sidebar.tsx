@@ -3,7 +3,6 @@ import { useState } from "react";
 
 const menuItems = [
   { id: "home", label: "Home", icon: Home },
-  { id: "live", label: "Live Readings", icon: Activity },
   { id: "past", label: "Past Days", icon: Calendar },
   { id: "warnings", label: "Warnings", icon: AlertTriangle },
   { id: "settings", label: "Settings", icon: Settings },
