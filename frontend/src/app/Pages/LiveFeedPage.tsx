@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Thermometer, Droplets, Sprout, Sun, AlertTriangle, AlertCircle, Activity, Wifi, WifiOff } from 'lucide-react';
+import { Thermometer, Droplets, Sprout, Sun, Wind, AlertTriangle, AlertCircle, Activity, Wifi, WifiOff } from 'lucide-react';
 
 interface SensorReading {
   id: string;
@@ -8,7 +8,7 @@ interface SensorReading {
   subtitle: string;
   icon: any;
   progress: number;
-  tone: 'red' | 'blue' | 'green' | 'amber';
+  tone: 'red' | 'blue' | 'green' | 'amber' | 'violet';
   unit: string;
 }
 
@@ -22,93 +22,189 @@ interface ActivityItem {
 }
 
 export function LiveFeedPage() {
-  const [isConnected, setIsConnected] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   
   const [liveData, setLiveData] = useState({
-    temperature: 28.5,
-    humidity: 72,
-    soil: 45,
-    light: 8500
+    temperature: null as number | null,
+    humidity: null as number | null,
+    soil: null as number | null,
+    light: null as number | null,
+    airppm: null as number | null
   });
 
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([
-    { id: 1, icon: AlertTriangle, title: 'Critical Alert', message: 'Soil moisture dropped below 45%', time: '2 seconds ago', status: 'critical' },
-    { id: 2, icon: AlertCircle, title: 'Warning', message: 'Humidity decreasing - currently at 72%', time: '3 minutes ago', status: 'warning' },
-    { id: 3, icon: Activity, title: 'Sensor Update', message: 'Temperature sensor reading: 28.5°C', time: '5 seconds ago', status: 'info' },
-    { id: 4, icon: Droplets, title: 'Irrigation Started', message: 'Auto-irrigation system activated', time: '10 minutes ago', status: 'success' }
-  ]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
 
-  // Simulate real-time updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveData(prev => ({
-        temperature: +(prev.temperature + (Math.random() - 0.5) * 0.5).toFixed(1),
-        humidity: Math.min(100, Math.max(0, prev.humidity + (Math.random() - 0.5) * 2)),
-        soil: Math.min(100, Math.max(0, prev.soil + (Math.random() - 0.5) * 1)),
-        light: Math.min(20000, Math.max(0, prev.light + (Math.random() - 0.5) * 100))
-      }));
-      setLastUpdate(new Date());
-      
-      // Add random activity update
-      if (Math.random() > 0.7) {
-        const newActivity: ActivityItem = {
-          id: Date.now(),
-          icon: Activity,
-          title: 'Sensor Reading',
-          message: `New reading: Temp ${liveData.temperature}°C, Humidity ${liveData.humidity}%`,
-          time: 'Just now',
-          status: 'info'
-        };
-        setActivityFeed(prev => [newActivity, ...prev.slice(0, 9)]);
-      }
-    }, 3000);
+    let cancelled = false;
 
-    return () => clearInterval(interval);
+    const fetchLatestData = async () => {
+      try {
+        const response = await fetch('/api/sensors/latest');
+        if (!response.ok) {
+          throw new Error('Failed to fetch latest data');
+        }
+
+        const latest = await response.json();
+        if (cancelled || !latest) {
+          return;
+        }
+
+        const temperature = latest.readings?.temperature ?? latest.temperature ?? null;
+        const humidity = latest.readings?.humidity ?? latest.humidity ?? null;
+        const soil = latest.readings?.soil ?? latest.soil ?? null;
+        const light = latest.readings?.lux ?? latest.readings?.light ?? latest.lux ?? null;
+        const airppm = latest.readings?.airppm ?? latest.airppm ?? null;
+
+        setLiveData({ temperature, humidity, soil, light, airppm });
+        setLastUpdate(latest.timestamp ? new Date(latest.timestamp) : new Date());
+        setIsConnected(true);
+
+        const activityEntries: ActivityItem[] = [
+          {
+            id: Date.now(),
+            icon: Activity,
+            title: 'Sensor Update',
+            message: `Temp ${typeof temperature === 'number' ? `${temperature}°C` : '--'}, Humidity ${typeof humidity === 'number' ? `${humidity}%` : '--'}, Air PPM ${typeof airppm === 'number' ? airppm : '--'}`,
+            time: 'Just now',
+            status: 'info'
+          }
+        ];
+
+        if (typeof soil === 'number' && soil < 45) {
+          activityEntries.unshift({
+            id: Date.now() + 1,
+            icon: AlertTriangle,
+            title: 'Critical Alert',
+            message: `Soil moisture dropped to ${soil}%`,
+            time: 'Just now',
+            status: 'critical'
+          });
+        }
+
+        if (typeof humidity === 'number' && humidity < 65) {
+          activityEntries.unshift({
+            id: Date.now() + 2,
+            icon: AlertCircle,
+            title: 'Warning',
+            message: `Humidity is low at ${humidity}%`,
+            time: 'Just now',
+            status: 'warning'
+          });
+        }
+
+        setActivityFeed((prev) => [...activityEntries, ...prev].slice(0, 10));
+      } catch {
+        if (!cancelled) {
+          setIsConnected(false);
+        }
+      }
+    };
+
+    fetchLatestData();
+    const interval = window.setInterval(fetchLatestData, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
+
+  const clamp = (value: number | null, min: number, max: number) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return 0;
+    }
+
+    return Math.min(max, Math.max(min, value));
+  };
+
+  const formatRelativeUpdateTime = (date: Date | null) => {
+    if (!date) {
+      return 'Waiting for first update';
+    }
+
+    const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+
+    if (diffSeconds < 10) {
+      return 'Updated just now';
+    }
+
+    if (diffSeconds < 60) {
+      return `Updated ${diffSeconds}s ago`;
+    }
+
+    const minutes = Math.floor(diffSeconds / 60);
+    if (minutes < 60) {
+      return `Updated ${minutes}m ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) {
+      const remainingMinutes = minutes % 60;
+      return remainingMinutes > 0 ? `Updated ${hours}h ${remainingMinutes}m ago` : `Updated ${hours}h ago`;
+    }
+
+    return `Updated on ${date.toLocaleString()}`;
+  };
+
+  const subtitleText = isConnected ? formatRelativeUpdateTime(lastUpdate) : 'Disconnected from live source';
 
   const sensorCards: SensorReading[] = [
     {
       id: 'temperature',
       name: 'Temperature',
-      value: `${liveData.temperature} °C`,
-      subtitle: `Updated ${Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s ago`,
+      value: typeof liveData.temperature === 'number' ? `${liveData.temperature} °C` : '--',
+      subtitle: subtitleText,
       icon: Thermometer,
-      progress: (liveData.temperature / 40) * 100,
+      progress: (clamp(liveData.temperature, 0, 50) / 50) * 100,
       tone: 'red',
       unit: '°C'
     },
     {
       id: 'humidity',
       name: 'Humidity',
-      value: `${Math.round(liveData.humidity)}%`,
-      subtitle: `Updated ${Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s ago`,
+      value: typeof liveData.humidity === 'number' ? `${liveData.humidity}%` : '--',
+      subtitle: subtitleText,
       icon: Droplets,
-      progress: liveData.humidity,
+      progress: clamp(liveData.humidity, 0, 100),
       tone: 'blue',
       unit: '%'
     },
     {
       id: 'soil',
       name: 'Soil Moisture',
-      value: `${Math.round(liveData.soil)}%`,
-      subtitle: `Updated ${Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s ago`,
+      value: typeof liveData.soil === 'number' ? `${liveData.soil}%` : '--',
+      subtitle: subtitleText,
       icon: Sprout,
-      progress: liveData.soil,
+      progress: clamp(liveData.soil, 0, 100),
       tone: 'green',
       unit: '%'
     },
     {
       id: 'light',
       name: 'Light Intensity',
-      value: `${Math.round(liveData.light).toLocaleString()} lux`,
-      subtitle: `Updated ${Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s ago`,
+      value: typeof liveData.light === 'number' ? `${liveData.light} lux` : '--',
+      subtitle: subtitleText,
       icon: Sun,
-      progress: (liveData.light / 20000) * 100,
+      progress: (clamp(liveData.light, 0, 50000) / 50000) * 100,
       tone: 'amber',
       unit: 'lux'
+    },
+    {
+      id: 'airppm',
+      name: 'Air',
+      value: typeof liveData.airppm === 'number' ? `${liveData.airppm} ppm` : '--',
+      subtitle: subtitleText,
+      icon: Wind,
+      progress: (clamp(liveData.airppm, 0, 3000) / 3000) * 100,
+      tone: 'violet',
+      unit: 'ppm'
     }
   ];
+
+  const activeSensorCount = [liveData.temperature, liveData.humidity, liveData.soil, liveData.light, liveData.airppm].filter(
+    (v) => typeof v === 'number'
+  ).length;
 
   const toneClasses = {
     red: {
@@ -134,6 +230,12 @@ export function LiveFeedPage() {
       icon: 'bg-amber-100 text-amber-600',
       bar: 'bg-amber-500',
       barBg: 'bg-amber-100'
+    },
+    violet: {
+      wrapper: 'bg-violet-50 border-violet-200',
+      icon: 'bg-violet-100 text-violet-600',
+      bar: 'bg-violet-500',
+      barBg: 'bg-violet-100'
     }
   };
 
@@ -165,40 +267,46 @@ export function LiveFeedPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Live Data Feed</h2>
-          <p className="text-base text-gray-500 mt-1">Real-time sensor readings and system activity</p>
+          <p className="text-lg text-gray-500 mt-1">Real-time sensor readings and system activity</p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 border border-gray-200 rounded-lg bg-white text-right">
-            <p className="text-sm text-gray-500">Active Sensors</p>
-            <p className="text-2xl font-semibold text-gray-800">4/4</p>
+            <p className="text-lg text-gray-500">Active Sensors</p>
+            <p className="text-2xl font-semibold text-gray-800">{activeSensorCount}/5</p>
           </div>
           <div className="px-4 py-2 border border-gray-200 rounded-lg bg-white flex items-center gap-2">
             {isConnected ? (
               <>
                 <Wifi className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm font-semibold text-gray-800">Live</span>
+                <span className="text-lg font-semibold text-gray-800">Live</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               </>
             ) : (
               <>
                 <WifiOff className="w-4 h-4 text-red-500" />
-                <span className="text-sm font-semibold text-gray-800">Disconnected</span>
+                <span className="text-lg font-semibold text-gray-800">Offline</span>
               </>
             )}
           </div>
         </div>
       </div>
 
+      {!isConnected ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Live feed unavailable. Check backend API and MQTT ingestion service.
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-12 gap-6">
         {/* Sensor Cards - Left Column */}
         <div className="col-span-8 space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Live Sensor Readings</h3>
             <div className="space-y-3">
               {sensorCards.map((sensor) => {
@@ -213,8 +321,8 @@ export function LiveFeedPage() {
                           <Icon className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="text-base font-semibold text-gray-900">{sensor.name}</p>
-                          <p className="text-sm text-gray-500">{sensor.subtitle}</p>
+                          <p className="text-lg font-semibold text-gray-900">{sensor.name}</p>
+                          <p className="text-base text-gray-600">{sensor.subtitle}</p>
                         </div>
                       </div>
                       <p className="text-2xl font-bold text-gray-900">{sensor.value}</p>
@@ -234,25 +342,29 @@ export function LiveFeedPage() {
 
         {/* Activity Feed - Right Column */}
         <div className="col-span-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 h-[600px] flex flex-col">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 h-[600px] flex flex-col">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Activity Feed</h3>
             
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {activityFeed.map((activity) => {
+              {activityFeed.length === 0 ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-500">
+                  Waiting for live sensor activity...
+                </div>
+              ) : activityFeed.map((activity) => {
                 const Icon = activity.icon;
                 return (
                   <div
                     key={activity.id}
-                    className={`p-3 rounded-lg border-l-4 ${getStatusColor(activity.status)} bg-opacity-50 transition-all hover:shadow-sm`}
+                    className={`p-4 rounded-lg border-l-4 ${getStatusColor(activity.status)} bg-opacity-50 transition-all hover:shadow-sm`}
                   >
                     <div className="flex items-start gap-2">
                       <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${getStatusIconColor(activity.status)}`} />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${getStatusTextColor(activity.status)}`}>
+                        <p className={`text-lg font-semibold ${getStatusTextColor(activity.status)}`}>
                           {activity.title}
                         </p>
-                        <p className="text-sm text-gray-600 mt-1">{activity.message}</p>
-                        <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                        <p className="text-base text-gray-600 mt-1">{activity.message}</p>
+                        <p className="text-base text-gray-500 mt-1">{activity.time}</p>
                       </div>
                     </div>
                   </div>
@@ -265,7 +377,7 @@ export function LiveFeedPage() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Last update:</span>
                 <span className="text-gray-700 font-medium">
-                  {lastUpdate.toLocaleTimeString()}
+                  {lastUpdate ? lastUpdate.toLocaleTimeString() : '--'}
                 </span>
               </div>
             </div>
