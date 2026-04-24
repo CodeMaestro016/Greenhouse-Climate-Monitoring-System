@@ -13,7 +13,7 @@ const SensorData = require('../models/Sensor');
  */
 const getLatestSensorData = async () => {
   try {
-    const latestData = await SensorData.findOne().sort({ timestamp: -1 });
+    const latestData = await SensorData.findOne().sort({ timestamp: -1 }).lean();
     return latestData;
   } catch (error) {
     console.error('Error fetching sensor data:', error);
@@ -61,7 +61,7 @@ const getDailyAggregates = async (days = 7) => {
           },
           avgTemperature: { $avg: "$readings.temperature" },
           avgHumidity: { $avg: "$readings.humidity" },
-          avgLux: { $avg: "$readings.lux" },
+          avgLight: { $avg: "$readings.light" },
           avgAirPPM: { $avg: "$readings.airppm" },
           avgSoil: { $avg: "$readings.soil" },
           minTemperature: { $min: "$readings.temperature" },
@@ -148,7 +148,7 @@ const generateFallbackResponse = (question, sensorData) => {
     if (readings.humidity > 75) recommendations.push('improve ventilation');
     if (readings.humidity < 45) recommendations.push('increase humidity');
     if (readings.soil < 40) recommendations.push('water the plants');
-    if (readings.lux < 200) recommendations.push('check lighting');
+    if (readings.light < 200) recommendations.push('check lighting');
     
     if (recommendations.length > 0) {
       return `Recommendations: ${recommendations.join(', ')}.`;
@@ -201,7 +201,7 @@ const getAIResponse = async (question, conversationHistory = [], retryCount = 0)
         historicalContext = `
 Historical Data Analysis (Last ${days} days):
 ${dailyAggregates.map((day, index) => 
-  `Day ${index + 1}: Avg Temp ${day.avgTemperature?.toFixed(1)}°C, Avg Humidity ${day.avgHumidity?.toFixed(1)}%, Avg Light ${day.avgLux?.toFixed(0)} lux`
+  `Day ${index + 1}: Avg Temp ${day.avgTemperature?.toFixed(1)}°C, Avg Humidity ${day.avgHumidity?.toFixed(1)}%, Avg Light ${day.avgLight?.toFixed(0)} lux`
 ).join('\n')}
 `;
       }
@@ -212,7 +212,7 @@ ${dailyAggregates.map((day, index) =>
     if (sensorData && sensorData.readings) {
       console.log('Building sensor context with data:', JSON.stringify(sensorData, null, 2));
       console.log('Readings object:', JSON.stringify(sensorData.readings, null, 2));
-      console.log('Light value:', sensorData.readings.lux);
+      console.log('Light field value:', sensorData.readings.light);
       console.log('Has readings:', !!sensorData.readings);
       
       const readings = sensorData.readings;
@@ -221,7 +221,7 @@ Current Greenhouse Sensor Data:
 - Temperature: ${readings.temperature || 'N/A'}°C
 - Humidity: ${readings.humidity || 'N/A'}%
 - Soil Moisture: ${readings.soil || 'N/A'}%
-- Light Level: ${readings.lux || 'N/A'} lux
+- Light Level: ${readings.light || 'N/A'} lux
 - Air Quality: ${readings.airppm || 'N/A'} ppm
 - Last Updated: ${sensorData.timestamp || 'N/A'}
 `;
@@ -484,7 +484,7 @@ const getAIStatus = async (req, res) => {
         temperature: sensorData.readings?.temperature || 'N/A',
         humidity: sensorData.readings?.humidity || 'N/A',
         soilMoisture: sensorData.readings?.soil || 'N/A',
-        lightLevel: sensorData.readings?.lux || 'N/A',
+        lightLevel: sensorData.readings?.light || 'N/A',
         airQuality: sensorData.readings?.airppm || 'N/A',
         timestamp: sensorData.timestamp || 'N/A'
       } : null,
