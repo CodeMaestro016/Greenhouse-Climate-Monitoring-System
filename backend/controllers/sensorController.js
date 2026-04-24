@@ -1,18 +1,32 @@
 const SensorData = require("../models/Sensor");
 
 const parseLimit = (value, defaultLimit) => {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) {
+  if (value === undefined || value === null || value === "") {
     return defaultLimit;
   }
-  return Math.min(Math.floor(n), 15000);
+
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    return defaultLimit;
+  }
+
+  // limit=0 means "no limit" for full-history views.
+  if (n === 0) {
+    return null;
+  }
+
+  return Math.min(Math.floor(n), 50000);
 };
 
 // Get all sensor data
 const getAllSensorData = async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit, 15000);
-    const data = await SensorData.find().sort({ timestamp: -1 }).limit(limit);
+    const query = SensorData.find().sort({ timestamp: -1 });
+    if (limit !== null) {
+      query.limit(limit);
+    }
+    const data = await query;
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -34,7 +48,11 @@ const getSensorDataById = async (req, res) => {
   try {
     const { sensorId } = req.params;
     const limit = parseLimit(req.query.limit, 15000);
-    const data = await SensorData.find({ sensorId }).sort({ timestamp: -1 }).limit(limit);
+    const query = SensorData.find({ sensorId }).sort({ timestamp: -1 });
+    if (limit !== null) {
+      query.limit(limit);
+    }
+    const data = await query;
     res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });

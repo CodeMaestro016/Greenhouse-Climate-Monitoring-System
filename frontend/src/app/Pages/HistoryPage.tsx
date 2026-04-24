@@ -40,7 +40,8 @@ export function HistoryPage() {
     let cancelled = false;
 
     const getHistoryFetchLimit = () => {
-      return selectedSensorId === 'all' ? 5000 : 10000;
+      if (timeRange === 'all') return 'all';
+      return selectedSensorId === 'all' ? 15000 : 25000;
     };
 
     async function loadHistory() {
@@ -89,7 +90,7 @@ export function HistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedSensorId]);
+  }, [selectedSensorId, timeRange]);
 
   const getCustomPoints = () => {
     if (!customStartDate || !customEndDate) return 7;
@@ -669,14 +670,14 @@ export function HistoryPage() {
             <table className="w-full text-base">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-700">
-                  <th className="text-left py-3 px-3 font-semibold">Sensor ID</th>
-                  <th className="text-left py-3 px-3 font-semibold">Date</th>
-                  <th className="text-left py-3 px-3 font-semibold">Time</th>
-                  <th className="text-left py-3 px-3 font-semibold">Humidity</th>
-                  <th className="text-left py-3 px-3 font-semibold">Soil Moisture</th>
-                  <th className="text-left py-3 px-3 font-semibold">Light(lux)</th>
-                  <th className="text-left py-3 px-3 font-semibold">Temperature</th>
-                  <th className="text-left py-3 px-3 font-semibold">Air (PPM)</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Sensor ID</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Date</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Time</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Humidity</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Soil Moisture</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Light(lux)</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Temperature</th>
+                  <th className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold">Air (PPM)</th>
                 </tr>
               </thead>
               <tbody>
