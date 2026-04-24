@@ -3,7 +3,7 @@
  * Handles API communication with the backend AI assistant including conversation management
  */
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = ''; // Use relative URLs for Vite proxy
 
 export interface AIResponse {
   success: boolean;
