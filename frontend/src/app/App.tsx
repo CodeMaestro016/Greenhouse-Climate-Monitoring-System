@@ -7,12 +7,13 @@
  * - Overall layout structure with header, sidebar, and main content area
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Home, BarChart3, AlertTriangle, History, Bell, Settings, Sprout, MessageCircle, Bot, Sparkles, Send, X, Minimize2, Maximize2 } from 'lucide-react';
 import { DashboardPage } from './Pages/DashboardPage';
 import { AnalyticsPage } from './Pages/AnalyticsPage';
 import { AlertsPage } from './Pages/AlertsPage';
 import { HistoryPage } from './Pages/HistoryPage';
+import { chatWithAI, generateSessionId } from './services/aiAssistantService';
 import greenhouseHero from './components/assests/greenhouse-hero.jpg';
 
 // Type definition for available page views
@@ -40,35 +41,58 @@ function App() {
   const [assistantMessages, setAssistantMessages] = useState([
     { id: 1, role: 'assistant', text: 'I am here to answer greenhouse questions in plain language. Try one of the quick questions below.' }
   ]);
+  const [conversationId, setConversationId] = useState<string>('');
+  const [sessionId] = useState(() => generateSessionId());
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
 
   const dangerLevel = 62;
 
-  const getAssistantReply = (question: string) => {
-    const prompt = question.toLowerCase();
-    if (prompt.includes('temperature rising')) {
-      return 'Temperature is rising due to stronger midday light and dropping humidity. Open roof vents to 40% and monitor for 10 minutes.';
-    }
-    if (prompt.includes('lettuce') || prompt.includes('safe')) {
-      return 'Lettuce is mostly safe today, but moisture stress is emerging. Soil moisture is 45%, so run irrigation now to avoid leaf curl risk.';
-    }
-    if (prompt.includes('what should i do now')) {
-      return 'Priority steps: 1) Start irrigation for 15 minutes. 2) Keep humidity between 70-80%. 3) Re-check danger score after one control cycle.';
-    }
-    if (prompt.includes('last 7 day humidity trend')) {
-      return '7-day humidity trend shows gradual decrease from 78% to 72%. Consider increasing misting frequency.';
-    }
-    return 'I can explain live risks, suggest immediate actions, and summarize trends. Ask about temperature, humidity, irrigation, or safety status.';
-  };
-
-  const sendAssistantMessage = (questionText?: string) => {
+  const sendAssistantMessage = async (questionText?: string) => {
     const question = (questionText ?? assistantInput).trim();
-    if (!question) return;
+    if (!question || isLoadingAI) return;
+
+    // Add user message immediately
+    const userMessageId = Date.now();
     setAssistantMessages(prev => [
       ...prev,
-      { id: Date.now(), role: 'user', text: question },
-      { id: Date.now() + 1, role: 'assistant', text: getAssistantReply(question) }
+      { id: userMessageId, role: 'user', text: question }
     ]);
     setAssistantInput('');
+    setIsLoadingAI(true);
+
+    try {
+      // Generate conversation ID if not exists
+      const currentConversationId = conversationId || `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      if (!conversationId) {
+        setConversationId(currentConversationId);
+      }
+
+      // Call the actual backend AI service
+      const response = await chatWithAI(question, currentConversationId, sessionId);
+      
+      const assistantMessageId = Date.now() + 1;
+      setAssistantMessages(prev => [
+        ...prev,
+        { 
+          id: assistantMessageId, 
+          role: 'assistant', 
+          text: response.success ? response.response : 'Sorry, I encountered an error. Please try again.' 
+        }
+      ]);
+    } catch (error) {
+      console.error('Error sending message to AI:', error);
+      const errorMessageId = Date.now() + 1;
+      setAssistantMessages(prev => [
+        ...prev,
+        { 
+          id: errorMessageId, 
+          role: 'assistant', 
+          text: 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.' 
+        }
+      ]);
+    } finally {
+      setIsLoadingAI(false);
+    }
   };
 
   const handleOpenAlert = (warning: { title: string; message: string; severity: string }) => {
@@ -251,7 +275,16 @@ function App() {
                   <div className="px-3 py-2 border-b border-gray-100">
                     <div className="flex flex-wrap gap-1.5">
                       {assistantQuickQuestions.map((q) => (
-                        <button key={q} onClick={() => sendAssistantMessage(q)} className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
+                        <button 
+                          key={q} 
+                          onClick={() => sendAssistantMessage(q)} 
+                          disabled={isLoadingAI}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                            isLoadingAI 
+                              ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed' 
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
                           {q}
                         </button>
                       ))}
@@ -265,12 +298,39 @@ function App() {
                         {msg.text}
                       </div>
                     ))}
+                    {isLoadingAI && (
+                      <div className="max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed bg-white border border-gray-200 text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                          </div>
+                          <span className="text-gray-500">Thinking...</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="border-t border-gray-200 px-3 py-2">
                     <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1">
                       <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                      <input value={assistantInput} onChange={(e) => setAssistantInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendAssistantMessage()} placeholder="Ask me a question..." className="flex-1 border-none bg-transparent text-sm text-gray-700 outline-none" />
-                      <button onClick={() => sendAssistantMessage()} className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700">
+                      <input
+                        value={assistantInput}
+                        onChange={(e) => setAssistantInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendAssistantMessage()}
+                        placeholder="Ask me a question..."
+                        className={`flex-1 border-none bg-transparent text-sm text-gray-700 outline-none ${
+                          isLoadingAI ? 'cursor-not-allowed opacity-50' : ''
+                        }`}
+                        disabled={isLoadingAI}
+                      />
+                      <button
+                        onClick={() => sendAssistantMessage()}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 ${
+                          isLoadingAI ? 'cursor-not-allowed opacity-50' : ''
+                        }`}
+                        disabled={isLoadingAI}
+                      >
                         <Send className="h-3.5 w-3.5" />
                       </button>
                     </div>
