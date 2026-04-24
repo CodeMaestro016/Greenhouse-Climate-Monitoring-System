@@ -102,10 +102,78 @@ const getSensorTrends = async (hours = 24) => {
 
 
 /**
- * Get dynamic AI response using OpenAI API with real sensor data
+ * Generate fallback response based on sensor data when AI fails
  */
-const getAIResponse = async (question, conversationHistory = []) => {
+const generateFallbackResponse = (question, sensorData) => {
+  const isSafetyQuery = question.toLowerCase().includes('safe') || 
+                        question.toLowerCase().includes('danger') || 
+                        question.toLowerCase().includes('risk') ||
+                        question.toLowerCase().includes('ok') ||
+                        question.toLowerCase().includes('good');
+  
+  const isRecommendationQuery = question.toLowerCase().includes('recommend') || 
+                               question.toLowerCase().includes('suggest') || 
+                               question.toLowerCase().includes('should') || 
+                               question.toLowerCase().includes('what should') ||
+                               question.toLowerCase().includes('advice');
+
+  if (isSafetyQuery && sensorData && sensorData.readings) {
+    const readings = sensorData.readings;
+    const temp = readings.temperature;
+    const humidity = readings.humidity;
+    const soil = readings.soil;
+    
+    let safetyStatus = 'appears safe';
+    let concerns = [];
+    
+    if (temp > 30) concerns.push('high temperature');
+    if (temp < 15) concerns.push('low temperature');
+    if (humidity > 80) concerns.push('high humidity');
+    if (humidity < 40) concerns.push('low humidity');
+    if (soil < 30) concerns.push('dry soil');
+    
+    if (concerns.length > 0) {
+      safetyStatus = `needs attention - ${concerns.join(', ')}`;
+    }
+    
+    return `Based on current sensor data, your lettuce ${safetyStatus}. Temp: ${temp}°C, Humidity: ${humidity}%, Soil: ${soil}%`;
+  }
+  
+  if (isRecommendationQuery && sensorData && sensorData.readings) {
+    const readings = sensorData.readings;
+    const recommendations = [];
+    
+    if (readings.temperature > 28) recommendations.push('consider cooling');
+    if (readings.temperature < 18) recommendations.push('consider heating');
+    if (readings.humidity > 75) recommendations.push('improve ventilation');
+    if (readings.humidity < 45) recommendations.push('increase humidity');
+    if (readings.soil < 40) recommendations.push('water the plants');
+    if (readings.lux < 200) recommendations.push('check lighting');
+    
+    if (recommendations.length > 0) {
+      return `Recommendations: ${recommendations.join(', ')}.`;
+    } else {
+      return 'Current conditions appear optimal for your lettuce.';
+    }
+  }
+  
+  return 'I apologize, but I\'m having trouble connecting to the AI service. Please check your sensor data manually or try again later.';
+};
+
+/**
+ * Get dynamic AI response using OpenAI API with real sensor data and retry logic
+ */
+const getAIResponse = async (question, conversationHistory = [], retryCount = 0) => {
+  const maxRetries = 2;
+  
   try {
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('OpenAI API key not configured');
+      const sensorData = await getLatestSensorData();
+      return generateFallbackResponse(question, sensorData);
+    }
+    
     // Get latest sensor data for context
     const sensorData = await getLatestSensorData();
     
@@ -144,7 +212,7 @@ ${dailyAggregates.map((day, index) =>
     if (sensorData && sensorData.readings) {
       console.log('Building sensor context with data:', JSON.stringify(sensorData, null, 2));
       console.log('Readings object:', JSON.stringify(sensorData.readings, null, 2));
-      console.log('Light value:', sensorData.readings.light);
+      console.log('Light value:', sensorData.readings.lux);
       console.log('Has readings:', !!sensorData.readings);
       
       const readings = sensorData.readings;
@@ -153,7 +221,7 @@ Current Greenhouse Sensor Data:
 - Temperature: ${readings.temperature || 'N/A'}°C
 - Humidity: ${readings.humidity || 'N/A'}%
 - Soil Moisture: ${readings.soil || 'N/A'}%
-- Light Level: ${readings.light || 'N/A'} lux
+- Light Level: ${readings.lux || 'N/A'} lux
 - Air Quality: ${readings.airppm || 'N/A'} ppm
 - Last Updated: ${sensorData.timestamp || 'N/A'}
 `;
@@ -216,14 +284,29 @@ Provide a short, clear, and context-aware response based on the current sensor d
         headers: {
           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 10000 // 10 second timeout
       }
     );
 
     return response.data.choices[0].message.content.trim();
   } catch (error) {
-    console.error('OpenAI API Error:', error.message);
-    throw new Error('Failed to generate AI response');
+    console.error('OpenAI API Error (attempt', retryCount + 1, '):', error.message);
+    
+    // Retry logic
+    if (retryCount < maxRetries && 
+        (error.code === 'ECONNRESET' || 
+         error.code === 'ETIMEDOUT' || 
+         error.response?.status >= 500)) {
+      console.log(`Retrying OpenAI API call (${retryCount + 1}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+      return getAIResponse(question, conversationHistory, retryCount + 1);
+    }
+    
+    // Fallback response
+    console.log('Using fallback response due to API failure');
+    const sensorData = await getLatestSensorData();
+    return generateFallbackResponse(question, sensorData);
   }
 };
 
@@ -401,7 +484,7 @@ const getAIStatus = async (req, res) => {
         temperature: sensorData.readings?.temperature || 'N/A',
         humidity: sensorData.readings?.humidity || 'N/A',
         soilMoisture: sensorData.readings?.soil || 'N/A',
-        lightLevel: sensorData.readings?.light || 'N/A',
+        lightLevel: sensorData.readings?.lux || 'N/A',
         airQuality: sensorData.readings?.airppm || 'N/A',
         timestamp: sensorData.timestamp || 'N/A'
       } : null,
