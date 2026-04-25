@@ -432,7 +432,7 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
                 <div className="text-[28px] font-bold text-gray-900 mt-2 leading-none">{data.current}</div>
               </div>
 
-              {/* Chart */}
+              {/* Chart  */}
               <div className="min-w-0">
                 <ForecastLineChart data={timeSeriesData} color={metric.lineColor} fillColor={metric.fillColor} />
               </div>
