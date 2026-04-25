@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line } from 'recharts';
 import { ForecastView } from './ForecastView';
+import { DashboardAlerts } from './DashboardAlerts';
 
 type SensorStatus = 'optimal' | 'warning' | 'critical';
 
@@ -274,13 +275,13 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
         if (!cancelled) {
           setIsConnected(false);
           setDashboardRecords([]);
-          retryTimeout = window.setTimeout(fetchDashboardData, 5000);
+          retryTimeout = window.setTimeout(fetchDashboardData, 2000);
         }
       }
     };
 
     fetchDashboardData();
-    const interval = window.setInterval(fetchDashboardData, 5000);
+    const interval = window.setInterval(fetchDashboardData, 2000);
 
     return () => {
       cancelled = true;
@@ -552,70 +553,9 @@ export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) 
       </div>
 
       {/* Right Column - Alerts and Sensor Status */}
-      <div className="col-span-3 space-y-6">
-        {/* Alerts Panel */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-gray-900">Alerts</h2>
-            <span className="text-sm font-semibold text-red-700 bg-red-100 px-2 py-1 rounded-full">
-              {fallbackWarnings.length} Active
-            </span>
-          </div>
-
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-            {fallbackWarnings.map((warning) => {
-              const isHigh = warning.severity === 'high';
-              const isMedium = warning.severity === 'medium';
-
-              return (
-                <button
-                  type="button"
-                  key={warning.id}
-                  onClick={() => onOpenAlert?.(warning)}
-                  className={`rounded-lg border p-3 ${
-                    isHigh
-                      ? 'border-red-200 bg-red-50 hover:bg-red-100'
-                      : isMedium
-                      ? 'border-amber-200 bg-amber-50 hover:bg-amber-100'
-                      : 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-                  } text-left w-full transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    {isHigh ? (
-                      <XCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
-                    ) : isMedium ? (
-                      <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className={`text-sm font-semibold px-2 py-0.5 rounded-full ${
-                          isHigh ? 'bg-red-100 text-red-700' : isMedium ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {isHigh ? '🔴 Critical' : isMedium ? '🟡 Warning' : '🔵 Info'}
-                        </p>
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                          {warning.title.includes('Soil') ? '💧 Soil' :
-                           warning.title.includes('Humidity') ? '💨 Humidity' :
-                           warning.title.includes('Temperature') ? '🌡️ Temperature' :
-                           warning.title.includes('Light') ? '☀️ Light' :
-                           warning.title.includes('Air') ? '🌬️ Air Quality' : '📊 System'}
-                        </span>
-                      </div>
-                      <p className="text-base font-medium text-gray-900 leading-snug">{warning.title}</p>
-                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">{warning.message}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-xs text-gray-400">{warning.time}</p>
-                        <p className="text-xs text-emerald-600 font-medium">{warning.action}</p>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+<div className="col-span-3 space-y-6">
+  {/* Alerts Panel */}
+  <DashboardAlerts onOpenAlert={onOpenAlert} />
 
         {/* Sensor Status Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
