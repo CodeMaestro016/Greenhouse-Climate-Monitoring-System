@@ -10,6 +10,7 @@ import {
   XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell 
 } from 'recharts';
 import { AlertReport } from './AlertReport';
+import { getAlertRecommendation, AlertRecommendation } from '../services/alertRecommendationService';
 
 // Alert interface matching backend schema
 interface Alert {
@@ -260,6 +261,8 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [recommendations, setRecommendations] = useState<{ [key: string]: AlertRecommendation }>({});
+  const [loadingRecommendations, setLoadingRecommendations] = useState<{ [key: string]: boolean }>({});
 
   // Auto refresh every 2 seconds
   useEffect(() => {
@@ -324,6 +327,23 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAlerts(true);
+  };
+
+  const fetchRecommendation = async (alertId: string) => {
+    if (recommendations[alertId] || loadingRecommendations[alertId]) {
+      return; // Already fetched or loading
+    }
+
+    setLoadingRecommendations(prev => ({ ...prev, [alertId]: true }));
+    
+    try {
+      const recommendation = await getAlertRecommendation(alertId);
+      setRecommendations(prev => ({ ...prev, [alertId]: recommendation }));
+    } catch (error) {
+      console.error('Error fetching recommendation:', error);
+    } finally {
+      setLoadingRecommendations(prev => ({ ...prev, [alertId]: false }));
+    }
   };
 
   const toggleChartSeverity = (severity: string) => {
@@ -741,14 +761,53 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
                         <div className={`mt-4 rounded-lg p-3 border ${boxColors.actionBorder} ${boxColors.actionBg}`}>
                           <div className="flex items-start gap-2">
-                            <ArrowRight className={`w-4 h-4 ${boxColors.actionText} mt-0.5`} />
                             <div className="flex-1">
-                              <p className={`text-xs font-medium ${boxColors.actionText}`}>Recommended Action:</p>
-                              <p className={`text-sm ${boxColors.actionText}`}>
-                                {isLow ? `Increase ${getSensorDisplayName(alert.field).toLowerCase()} to optimal range (${min}-${max}${unit})` :
-                                 isHigh ? `Reduce ${getSensorDisplayName(alert.field).toLowerCase()} to optimal range (${min}-${max}${unit})` :
-                                 `Maintain current ${getSensorDisplayName(alert.field).toLowerCase()} levels`}
-                              </p>
+                              {/* AI Recommendation Button */}
+                              {!recommendations[alert._id] && (
+                                <button
+                                  onClick={() => fetchRecommendation(alert._id)}
+                                  disabled={loadingRecommendations[alert._id]}
+                                  className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    loadingRecommendations[alert._id] 
+                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                  }`}
+                                >
+                                  {loadingRecommendations[alert._id] ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                      <div className="w-4 h-4 border border-emerald-300 border-t-transparent animate-spin rounded-full"></div>
+                                      Getting AI Recommendation...
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center justify-center gap-2">
+                                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                      Get AI Recommendation
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                              
+                              {/* Display AI recommendation if available */}
+                              {recommendations[alert._id] && (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-5 h-5 flex-shrink-0 mt-0.5">
+                                      <div className="w-full h-full bg-emerald-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white text-xs font-bold">AI</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-medium text-emerald-700 mb-1">AI Recommendation:</p>
+                                      <p className="text-emerald-800">
+                                        {recommendations[alert._id].recommendation}
+                                      </p>
+                                      <p className="text-xs text-emerald-600 mt-2">
+                                        Generated by {recommendations[alert._id].generatedBy}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
