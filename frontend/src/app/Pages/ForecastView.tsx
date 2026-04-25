@@ -75,7 +75,7 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
 
   useEffect(() => {
     fetchForecast();
-    const interval = setInterval(fetchForecast, 300000);
+    const interval = setInterval(fetchForecast,  120000);
     return () => clearInterval(interval);
   }, [sensorId, lat, lon]);
 
