@@ -5,7 +5,8 @@ const {
   getAlerts,
   getAlertById,
   getAlertStats,
-  deleteOldAlerts
+  deleteOldAlerts,
+  deleteAllAlerts 
 } = require("../controllers/alertController");
 
 // Get all alerts
@@ -19,5 +20,8 @@ router.get("/:id", getAlertById);
 
 // Delete old alerts
 router.delete("/cleanup", deleteOldAlerts);
+
+// ✅ NEW: Clear all alerts
+router.delete("/clear", deleteAllAlerts);
 
 module.exports = router;

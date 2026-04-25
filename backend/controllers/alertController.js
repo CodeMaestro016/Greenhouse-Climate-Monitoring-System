@@ -40,6 +40,21 @@ const normalizeFieldName = (field) => {
   }
 };
 
+// ✅ Delete ALL alerts
+const deleteAllAlerts = async (req, res) => {
+  try {
+    const result = await Alert.deleteMany({});
+
+    res.json({
+      success: true,
+      message: `Deleted ${result.deletedCount} alerts`
+    });
+  } catch (error) {
+    console.error("Error deleting all alerts:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 // Severity logic
 const getSeverity = (value, min, max) => {
   const range = max - min;
@@ -325,5 +340,6 @@ module.exports = {
   getAlertById,
   getAlertStats,
   deleteOldAlerts,
+  deleteAllAlerts,
   SAFE_RANGES
 };
