@@ -10,6 +10,7 @@ import {
   XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell 
 } from 'recharts';
 import { AlertReport } from './AlertReport';
+import { useAppStore, type AlertsPageAlert } from '../store/appStore';
 import { getAlertRecommendation, AlertRecommendation } from '../services/alertRecommendationService';
 
 // Alert interface matching backend schema
@@ -250,6 +251,29 @@ interface AlertsPageProps {
   selectedAlertId?: string | null;
 }
 
+const alertsChanged = (
+  currentAlerts: Array<{ _id: string; timestamp: string; value: number; severity: string }>,
+  newAlerts: Array<{ _id: string; timestamp: string; value: number; severity: string }>
+) => {
+  if (currentAlerts.length !== newAlerts.length) return true;
+
+  for (let i = 0; i < currentAlerts.length; i += 1) {
+    const current = currentAlerts[i];
+    const incoming = newAlerts[i];
+
+    if (
+      current._id !== incoming._id ||
+      current.timestamp !== incoming.timestamp ||
+      current.value !== incoming.value ||
+      current.severity !== incoming.severity
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const [showReport, setShowReport] = useState(false);
   const [trendRange, setTrendRange] = useState<'24h' | '48h' | '72h'>('24h');
@@ -257,20 +281,22 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const [historySeverityFilter, setHistorySeverityFilter] = useState<string>('all');
   const [historyTimeFilter, setHistoryTimeFilter] = useState<'24h' | '48h' | '72h' | '7d' | '30d'>('24h');
   const [categoryTimeFilter, setCategoryTimeFilter] = useState<'24h' | '48h' | '72h' | '7d' | '30d'>('24h');
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
+  const alerts = useAppStore((state) => state.alertsPageAlerts);
+  const loading = useAppStore((state) => state.alertsPageLoading);
+  const setAlerts = useAppStore((state) => state.setAlertsPageAlerts);
+  const setLoading = useAppStore((state) => state.setAlertsPageLoading);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState<{ [key: string]: AlertRecommendation }>({});
   const [loadingRecommendations, setLoadingRecommendations] = useState<{ [key: string]: boolean }>({});
 
-  // Auto refresh every 2 seconds
+  // Auto refresh every 5 seconds
   useEffect(() => {
-    fetchAlerts();
+    fetchAlerts(alerts.length === 0);
 
     const interval = setInterval(() => {
       fetchAlerts(false);
-    }, 2000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -296,22 +322,20 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
       setError(null);
 
-      const response = await fetch('/api/alerts?limit=100000');
+      const response = await fetch('/api/alerts?limit=500');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      const newAlerts = data.data || (Array.isArray(data) ? data : []);
+      const newAlerts = (data.data || (Array.isArray(data) ? data : [])) as AlertsPageAlert[];
+      const currentAlerts = useAppStore.getState().alertsPageAlerts;
 
-      setAlerts(prev => {
-        if (JSON.stringify(prev) !== JSON.stringify(newAlerts)) {
-          console.log(`Alerts updated: ${prev.length} -> ${newAlerts.length}`);
-          return newAlerts;
-        }
-        return prev;
-      });
+      if (alertsChanged(currentAlerts, newAlerts)) {
+        console.log(`Alerts updated: ${currentAlerts.length} -> ${newAlerts.length}`);
+        setAlerts(newAlerts);
+      }
 
     } catch (err) {
       console.error('Error fetching alerts:', err);
@@ -331,7 +355,7 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
   const handleClearAllAlerts = async () => {
     try {
-      const response = await fetch('/api/alerts', {
+      const response = await fetch('/api/alerts/clear', {
         method: 'DELETE',
       });
       
