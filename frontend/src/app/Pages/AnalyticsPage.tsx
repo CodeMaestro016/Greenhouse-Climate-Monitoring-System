@@ -1,5 +1,5 @@
 /**
- * AnalyticsPage.tsx — Farm Insights + Analysis Charts
+ * AnalyticsPage.tsx - Farm Insights + Analysis Charts
  *
  * Top section  : Condition Summary cards (one per sensor reading) + Best Time to Act
  * Bottom section: Trend chart, Correlation chart, ML Anomaly chart
@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle, Brain, ChartLine, Clock,
-  Droplets, Leaf, Link2, Sun, Thermometer, Wind, Droplet,
+  Droplets, Leaf, Link2, Sun, Thermometer, Wind,
 } from 'lucide-react';
 import {
   CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,
@@ -37,6 +37,7 @@ type ConditionSummary = {
 type TrendPoint       = { timestamp: string; value: number };
 type CorrelationPoint = { x: number; y: number };
 type AnomalyPoint     = { timestamp?: string; value: number; isAnomaly: boolean };
+type CorrelationSeverity = 'neutral' | 'warning' | 'critical' | 'good';
 
 type TrendResponse = {
   sensorId: string; field: string; count: number;
@@ -53,7 +54,6 @@ type MLResponse = {
   count: number; anomalyCount: number;
   results: AnomalyPoint[]; anomalies: AnomalyPoint[];
 };
-
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -77,29 +77,29 @@ const FIELD_META: Record<Field, { label: string; unit: string; increasingBad: bo
 
 const FIELD_MESSAGES: Record<Field, Record<Direction, string>> = {
   temperature: {
-    increasing: 'Temperature is climbing — open vents or add shade.',
-    decreasing: 'Temperature is falling — close vents at night to protect crops.',
-    stable:     'Temperature is stable — no action needed.',
+    increasing: 'Temperature is climbing - open vents or add shade.',
+    decreasing: 'Temperature is falling - close vents at night to protect crops.',
+    stable:     'Temperature is stable - no action needed.',
   },
   humidity: {
-    increasing: 'Humidity is rising — improve airflow to reduce fungal risk.',
-    decreasing: 'Humidity is dropping — reduce heat stress and monitor air dryness.',
-    stable:     'Humidity is balanced — no action needed.',
+    increasing: 'Humidity is rising - improve airflow to reduce fungal risk.',
+    decreasing: 'Humidity is dropping - reduce heat stress and monitor air dryness.',
+    stable:     'Humidity is balanced - no action needed.',
   },
   soil: {
-    increasing: 'Soil is getting wetter — check for drainage issues and sensor drift.',
-    decreasing: 'Soil moisture is decreasing — inspect root-zone conditions soon.',
-    stable:     'Soil moisture is steady — keep current environment settings.',
+    increasing: 'Soil is getting wetter - check for drainage issues and sensor drift.',
+    decreasing: 'Soil moisture is decreasing - inspect root-zone conditions soon.',
+    stable:     'Soil moisture is steady - keep current environment settings.',
   },
   airppm: {
-    increasing: 'Air quality is worsening — open vents to flush out CO₂.',
-    decreasing: 'Air quality is improving — ventilation is working well.',
-    stable:     'Air quality is steady — no action needed.',
+    increasing: 'Air quality is worsening - open vents to flush out CO₂.',
+    decreasing: 'Air quality is improving - ventilation is working well.',
+    stable:     'Air quality is steady - no action needed.',
   },
   light: {
-    increasing: 'Light levels are climbing — watch for heat build-up from direct sun.',
-    decreasing: 'Light is fading — check if shade cloth is blocking too much.',
-    stable:     'Light levels are consistent — no action needed.',
+    increasing: 'Light levels are climbing - watch for heat build-up from direct sun.',
+    decreasing: 'Light is fading - check if shade cloth is blocking too much.',
+    stable:     'Light levels are consistent - no action needed.',
   },
 };
 
@@ -177,11 +177,11 @@ function buildTimeInsights(records: SensorRecord[]) {
     const label  = FIELD_META[field].label;
     const prevOf = (h: number) => formatHour(Math.max(0, h - 1));
     let insight = '';
-    if      (field === 'temperature') insight = `Temperature peaks around ${formatHour(maxH.hour)} — open vents by ${prevOf(maxH.hour)}.`;
-    else if (field === 'humidity')    insight = `Humidity is lowest around ${formatHour(minH.hour)} — plan airflow checks before ${formatHour(minH.hour)}.`;
-    else if (field === 'soil')        insight = `Soil moisture is lowest around ${formatHour(minH.hour)} — inspect root-zone conditions before ${formatHour(minH.hour)}.`;
-    else if (field === 'light')       insight = `Light is strongest around ${formatHour(maxH.hour)} — check shade cloth by ${prevOf(maxH.hour)}.`;
-    else if (field === 'airppm')      insight = `Air quality is worst around ${formatHour(maxH.hour)} — ensure vents are open by ${prevOf(maxH.hour)}.`;
+    if      (field === 'temperature') insight = `Temperature peaks around ${formatHour(maxH.hour)} - open vents by ${prevOf(maxH.hour)}.`;
+    else if (field === 'humidity')    insight = `Humidity is lowest around ${formatHour(minH.hour)} - plan airflow checks before ${formatHour(minH.hour)}.`;
+    else if (field === 'soil')        insight = `Soil moisture is lowest around ${formatHour(minH.hour)} - inspect root-zone conditions before ${formatHour(minH.hour)}.`;
+    else if (field === 'light')       insight = `Light is strongest around ${formatHour(maxH.hour)} - check shade cloth by ${prevOf(maxH.hour)}.`;
+    else if (field === 'airppm')      insight = `Air quality is worst around ${formatHour(maxH.hour)} - ensure vents are open by ${prevOf(maxH.hour)}.`;
     if (insight) insights.push({ field, label, insight });
   }
   return insights;
@@ -229,33 +229,84 @@ const getActionHint = (field: string, value: number | null) => {
   return 'Keep monitoring';
 };
 
-const getCorrelationAction = (field1: string, field2: string, correlation: number | null) => {
+// Rule-based insight: temperature vs humidity only
+const getCorrelationInsight = (
+  correlation: number | null,
+  tempDirection: 'increasing' | 'decreasing' | 'stable' | null
+) : { prediction: string | null; action: string | null; severity: CorrelationSeverity } => {
   if (correlation === null || !Number.isFinite(correlation))
-    return 'Not enough data yet to turn this relationship into a field action.';
-  const strength  = Math.abs(correlation);
-  const direction = correlation >= 0 ? 'move together' : 'move in opposite directions';
-  if (strength < 0.35) return 'These two readings do not strongly affect each other.';
-  if ((field1 === 'temperature' && field2 === 'humidity') || (field1 === 'humidity' && field2 === 'temperature'))
-    return correlation < 0
-      ? 'When temperature rises, humidity usually drops. Open vents carefully and watch for dry-air stress.'
-      : 'Temperature and humidity rise together here. Check airflow controls.';
-  if ((field1 === 'soil' && field2 === 'temperature') || (field1 === 'temperature' && field2 === 'soil'))
-    return correlation < 0
-      ? 'Hotter conditions are drying the soil. Increase soil-condition checks on warm days.'
-      : 'Soil and temperature are moving together. Review shading and heat management timing.';
-  if ((field1 === 'soil' && field2 === 'humidity') || (field1 === 'humidity' && field2 === 'soil'))
-    return correlation > 0
-      ? 'Soil moisture and humidity rise together. Watch for fungal risk.'
-      : 'Soil and humidity move in opposite directions. Use the drier one as your warning signal.';
-  if ((field1 === 'light' && field2 === 'temperature') || (field1 === 'temperature' && field2 === 'light'))
-    return correlation > 0
-      ? 'More light is also heating the crop area. Shade or vent before the plants overheat.'
-      : 'Light and temperature are not moving together. Check shade cloth or cloud cover.';
-  if ((field1 === 'airppm' && field2 === 'humidity') || (field1 === 'humidity' && field2 === 'airppm'))
-    return correlation > 0
-      ? 'Air is getting heavier as humidity rises. Increase airflow to keep disease risk lower.'
-      : 'Air quality improves when humidity changes. Use airflow as the control lever.';
-  return `These readings ${direction}. Confirm with the crop and the room itself.`;
+    return { prediction: null, action: null, severity: 'neutral' };
+
+  const abs  = Math.abs(correlation);
+  const dir  = tempDirection ?? 'stable';
+
+  // Strength tiers
+  const isStrong   = abs > 0.7;
+  const isModerate = abs >= 0.35 && abs <= 0.7;
+  const isWeak     = abs < 0.35;
+  const qualifier  = isStrong ? 'very likely' : isModerate ? 'likely' : 'slight chance';
+
+  if (correlation < 0) {
+    // Inverse: as temperature rises, humidity falls (and vice-versa)
+    if (dir === 'increasing') return {
+      prediction: isWeak
+        ? 'Temperature is rising. There is a slight chance humidity will drop — keep an eye on it.'
+        : `Temperature is rising. Humidity will ${qualifier} drop soon.`,
+      action: isWeak
+        ? 'Keep an eye on humidity levels over the next few hours.'
+        : isStrong
+          ? 'Open vents now and prepare to mist the plants — humidity will fall fast.'
+          : 'Open vents and prepare to mist the plants.',
+      severity: isWeak ? 'neutral' : 'warning',
+    };
+    if (dir === 'decreasing') return {
+      prediction: isWeak
+        ? 'Temperature is falling. There is a slight chance humidity will rise — keep an eye on it.'
+        : `Temperature is falling. Humidity will ${qualifier} rise.`,
+      action: isWeak
+        ? 'Keep an eye on humidity levels over the next few hours.'
+        : isStrong
+          ? 'Run the fans straight away — rising moisture increases mould risk fast.'
+          : 'Run the fans to stop moisture building up and prevent mould.',
+      severity: isWeak ? 'neutral' : 'warning',
+    };
+    // stable
+    return {
+      prediction: 'Temperature and humidity are holding steady right now.',
+      action:     'Keep current ventilation and check in on conditions.',
+      severity:   'good',
+    };
+  } else {
+    // Positive: both move in the same direction
+    if (dir === 'increasing') return {
+      prediction: isWeak
+        ? 'Temperature and humidity are both rising slightly.'
+        : 'Temperature and humidity are both climbing.',
+      action: isWeak
+        ? 'Keep an eye on conditions — check that ventilation is working.'
+        : isStrong
+          ? 'Open vents immediately — high heat and moisture together raise disease risk fast.'
+          : 'Open vents now — heat and moisture together increase disease risk.',
+      severity: isWeak ? 'neutral' : 'critical',
+    };
+    if (dir === 'decreasing') return {
+      prediction: isWeak
+        ? 'Temperature and humidity are both easing off slightly.'
+        : 'Temperature and humidity are both dropping.',
+      action: isWeak
+        ? 'Keep an eye on conditions — protect sensitive plants if it gets colder.'
+        : isStrong
+          ? 'Protect sensitive crops now — consider heating and misting straight away.'
+          : 'Protect sensitive crops from cold and dry stress. Consider heating.',
+      severity: isWeak ? 'neutral' : 'warning',
+    };
+    // stable
+    return {
+      prediction: 'Temperature and humidity are moving together and holding steady.',
+      action:     'No action needed right now. Keep monitoring.',
+      severity:   'good',
+    };
+  }
 };
 
 const getAnomalyAction = (field: string, count: number, total: number) => {
@@ -264,7 +315,7 @@ const getAnomalyAction = (field: string, count: number, total: number) => {
   if (field === 'soil')        return rate > 0.2 ? 'Several soil readings are unusual. Inspect root-zone variability and sensor placement.' : 'One or two soil readings are off. Check localized wet/dry zones.';
   if (field === 'temperature') return rate > 0.2 ? 'Temperature spikes are repeating. Check vents, shade, and fans.' : 'A few temperature readings are unusual. Inspect the sensor location for hot spots.';
   if (field === 'humidity')    return rate > 0.2 ? 'Humidity swings are repeating. Review airflow settings and enclosure sealing.' : 'A few humidity readings are unusual. Check for blocked fans or local drafts.';
-  if (field === 'light')       return rate > 0.2 ? 'Light is fluctuating too much. Inspect shade cloth or lamps.' : 'A small light spike — check that corner first.';
+  if (field === 'light')       return rate > 0.2 ? 'Light is fluctuating too much. Inspect shade cloth or lamps.' : 'A small light spike - check that corner first.';
   if (field === 'airppm')      return rate > 0.2 ? 'Air quality readings are unstable. Improve ventilation.' : 'A small air-quality anomaly may point to poor circulation near the sensor.';
   return 'Check the affected area in person before making a large control change.';
 };
@@ -286,8 +337,6 @@ function FieldIcon({ field, className = 'h-5 w-5' }: { field: Field; className?:
 export function AnalyticsPage() {
   const [sensorId,   setSensorId]   = useState('');
   const [trendField, setTrendField] = useState('temperature');
-  const [corrField1, setCorrField1] = useState('temperature');
-  const [corrField2, setCorrField2] = useState('humidity');
   const [mlField,    setMlField]    = useState('temperature');
   const [limit,      setLimit]      = useState(100);
 
@@ -296,7 +345,7 @@ export function AnalyticsPage() {
   const [mlLoading,    setMlLoading]    = useState(false);
   const isChartLoading = trendLoading || corrLoading || mlLoading;
 
-  const [loadError,  setLoadError]  = useState<string | null>(null);
+  const [loadError,       setLoadError]       = useState<string | null>(null);
   const [trendData,       setTrendData]       = useState<TrendResponse | null>(null);
   const [correlationData, setCorrelationData] = useState<CorrelationResponse | null>(null);
   const [mlData,          setMlData]          = useState<MLResponse | null>(null);
@@ -384,13 +433,13 @@ export function AnalyticsPage() {
   const runAnalysis = () => {
     if (!sensorId) { setLoadError('Select a sensor ID to run analysis.'); return; }
     runTrend(sensorId, trendField);
-    runCorrelation(sensorId, corrField1, corrField2);
+    runCorrelation(sensorId, 'temperature', 'humidity');
     runML(sensorId, mlField);
   };
 
-  useEffect(() => { if (sensorId) runTrend(sensorId, trendField); },                    [sensorId, trendField]);
-  useEffect(() => { if (sensorId) runCorrelation(sensorId, corrField1, corrField2); },  [sensorId, corrField1, corrField2]);
-  useEffect(() => { if (sensorId) runML(sensorId, mlField); },                          [sensorId, mlField]);
+  useEffect(() => { if (sensorId) runTrend(sensorId, trendField); },                          [sensorId, trendField]);
+  useEffect(() => { if (sensorId) runCorrelation(sensorId, 'temperature', 'humidity'); },     [sensorId]);
+  useEffect(() => { if (sensorId) runML(sensorId, mlField); },                                [sensorId, mlField]);
 
   // ── Derived card data ─────────────────────────────────────────────────────
   const conditions = useMemo((): ConditionSummary[] => {
@@ -492,8 +541,46 @@ export function AnalyticsPage() {
 
       {/* ── 3. Analysis Charts ────────────────────────────────────────────── */}
       <section>
+        {/* ── Temperature / Humidity insight (rule-based) ── */}
+        {(() => {
+          const tempDir = trendData?.field === 'temperature' ? trendData.trend : null;
+          const insight = getCorrelationInsight(correlationData?.correlation ?? null, tempDir);
+          const borderCls = insight.severity === 'critical' ? 'border-rose-300 bg-rose-50'
+                          : insight.severity === 'warning'  ? 'border-amber-300 bg-amber-50'
+                          : insight.severity === 'good'     ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-gray-200 bg-gray-50';
+          const labelCls  = insight.severity === 'critical' ? 'text-rose-700'
+                          : insight.severity === 'warning'  ? 'text-amber-700'
+                          : insight.severity === 'good'     ? 'text-emerald-700'
+                          : 'text-gray-500';
+          return (
+            <div className={`mb-4 rounded-xl border-2 p-5 ${borderCls}`}>
+              <div className="mb-3 flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-sky-700" />
+                <h4 className="text-base font-semibold text-gray-800">Temperature &amp; Humidity — What to expect next</h4>
+              </div>
+              {corrLoading && <p className="text-sm text-gray-500">Calculating…</p>}
+              {!corrLoading && correlationData && insight.prediction && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${labelCls}`}>What is likely to happen</p>
+                    <p className="text-lg font-semibold text-gray-800">{insight.prediction}</p>
+                  </div>
+                  <div>
+                    <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${labelCls}`}>What to do</p>
+                    <p className="text-lg font-semibold text-gray-800">{insight.action}</p>
+                  </div>
+                </div>
+              )}
+              {!corrLoading && !correlationData && (
+                <p className="text-sm text-gray-500">Click Run Analysis to see the insight.</p>
+              )}
+            </div>
+          );
+        })()}
+
         <h3 className="mb-3 text-lg font-semibold text-gray-800">Deep-Dive Charts</h3>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
           {/* Trend chart */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -508,12 +595,13 @@ export function AnalyticsPage() {
               </select>
             </div>
 
+
             {trendData && (
               <div className="mb-3 grid grid-cols-3 gap-2 text-center text-sm">
                 {[
-                  { label: 'Trend',        val: TREND_LABELS[trendData.trend]         },
-                  { label: 'Change speed', val: trendData.slope.toFixed(2)            },
-                  { label: 'Action',       val: getActionHint(trendData.field, trendData.latestValue) },
+                  { label: 'Trend',        val: TREND_LABELS[trendData.trend] },
+                  { label: 'Change speed', val: trendData.slope.toFixed(2)    },
+                  { label: 'What it means', val: getActionHint(trendData.field, trendData.latestValue) },
                 ].map(({ label, val }) => (
                   <div key={label} className="rounded-md bg-gray-100 px-2 py-2">
                     <p className="text-gray-500">{label}</p>
@@ -531,52 +619,9 @@ export function AnalyticsPage() {
                   <YAxis stroke="#6b7280" />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="value"         name="Reading"      stroke="#0f766e" strokeWidth={2} dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="movingAverage" name="Moving avg"   stroke="#2563eb" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="value"         name="Reading"    stroke="#3b82f6" strokeWidth={3} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="movingAverage" name="Moving avg"  stroke="#f97316" strokeWidth={3} dot={false} isAnimationActive={false} />
                 </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Correlation chart */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-5 w-5 text-sky-700" />
-                <h4 className="text-base font-semibold text-gray-800">How factors relate</h4>
-              </div>
-              <div className="flex items-center gap-1">
-                {[corrField1, corrField2].map((val, i) => (
-                  <select key={i} value={val}
-                    onChange={e => i === 0 ? setCorrField1(e.target.value) : setCorrField2(e.target.value)}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm">
-                    {FIELD_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                  </select>
-                ))}
-              </div>
-            </div>
-
-            {correlationData && (
-              <div className="mb-3 rounded-md bg-gray-100 px-3 py-2 text-sm">
-                <span className="font-semibold text-gray-700">Strength: {correlationData.correlation.toFixed(2)}</span>
-                <span className="ml-2 text-gray-500">— {correlationData.interpretation}</span>
-                <p className="mt-1 text-gray-600">{getCorrelationAction(correlationData.field1, correlationData.field2, correlationData.correlation)}</p>
-              </div>
-            )}
-
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="x" name={getFieldLabel(corrField1)} stroke="#6b7280" />
-                  <YAxis dataKey="y" name={getFieldLabel(corrField2)} stroke="#6b7280" />
-                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                  <Legend />
-                  <Scatter
-                    name={`${getFieldLabel(corrField1)} vs ${getFieldLabel(corrField2)}`}
-                    data={correlationData?.data || []}
-                    fill="#0284c7" isAnimationActive={false} />
-                </ScatterChart>
               </ResponsiveContainer>
             </div>
           </div>
@@ -628,6 +673,7 @@ export function AnalyticsPage() {
           </div>
 
         </div>
+
       </section>
 
       {!isLoading && records.length === 0 && sensorId && (
