@@ -13,7 +13,7 @@ const getOneHourForecast = async (req, res) => {
     // Get recent sensor data as plain JS objects
     let sensorHistory = await SensorData.find({ sensorId })
       .sort({ timestamp: -1 })
-      .limit(12)
+      .limit(60)
       .lean();
 
     if (!sensorHistory || sensorHistory.length === 0) {
