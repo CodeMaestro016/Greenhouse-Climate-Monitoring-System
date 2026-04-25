@@ -54,10 +54,15 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
   const [forecastData, setForecastData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchForecast = async () => {
+  const fetchForecast = async (showRefreshIndicator = false) => {
     try {
-      setLoading(true);
+      if (showRefreshIndicator) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
       const response = await fetch(`/api/forecast/1hour?sensorId=${sensorId}&lat=${lat}&lon=${lon}`);
       if (!response.ok) {
@@ -70,12 +75,17 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       setError('Unable to load forecast data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchForecast(true);
   };
 
   useEffect(() => {
     fetchForecast();
-    const interval = setInterval(fetchForecast,  120000);
+    const interval = setInterval(() => fetchForecast(true), 120000);
     return () => clearInterval(interval);
   }, [sensorId, lat, lon]);
 
@@ -113,18 +123,24 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
   };
 
   // FARMER-FRIENDLY: Simple trend messages for air
-  const getAirQualityTrendMessage = (current: number, predicted: number, trend: string): string => {
+  const getAirQualityTrendMessage = (current: number, predicted: number): string => {
     if (current === 0 && predicted === 0) return 'No data';
     
-    if (trend === 'stable') {
+    const diff = predicted - current;
+    if (Math.abs(diff) < 0.01) {
       return `👉 Will stay at ${predicted} ppm (${getAirQualityStatus(predicted)})`;
     }
-    
-    if (trend === 'up') {
+    if (diff > 0) {
       return `👉 May reach ${predicted} ppm (${getAirQualityStatus(predicted)})`;
-    } else {
-      return `👉 May drop to ${predicted} ppm (${getAirQualityStatus(predicted)})`;
     }
+    return `👉 May drop to ${predicted} ppm (${getAirQualityStatus(predicted)})`;
+  };
+
+  // HELPER: Get trend based on ACTUAL difference (0.01 threshold for any change)
+  const getActualTrend = (current: number, predicted: number): 'up' | 'down' | 'stable' => {
+    const diff = predicted - current;
+    if (Math.abs(diff) < 0.01) return 'stable';
+    return diff > 0 ? 'up' : 'down';
   };
 
   const forecastMetrics = [
@@ -140,16 +156,18 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       rightBg: 'bg-red-50',
       rightText: 'text-red-600',
       borderColor: 'border-red-100',
-      // FARMER-FRIENDLY: Simple status messages
-      getStatusMessage: (current: number, predicted: number, trend: string) => {
+      getStatusMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
         if (trend === 'stable') return 'Temperature steady';
         if (trend === 'up') return 'Will get warmer';
         return 'Will get cooler';
       },
-      getReachMessage: (current: number, predicted: number, unit: string, trend: string) => {
-        if (trend === 'stable') return `👉 Stays at ${predicted}${unit}`;
-        if (trend === 'up') return `👉 May reach ${predicted}${unit}`;
-        return `👉 May drop to ${predicted}${unit}`;
+      getReachMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
+        const formatted = predicted.toFixed(1);
+        if (trend === 'stable') return `👉 Stays at ${formatted}°C`;
+        if (trend === 'up') return `👉 May reach ${formatted}°C`;
+        return `👉 May drop to ${formatted}°C`;
       }
     },
     {
@@ -164,15 +182,18 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       rightBg: 'bg-blue-50',
       rightText: 'text-blue-600',
       borderColor: 'border-blue-100',
-      getStatusMessage: (current: number, predicted: number, trend: string) => {
+      getStatusMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
         if (trend === 'stable') return 'Humidity steady';
         if (trend === 'up') return 'Will get more humid';
         return 'Will get drier';
       },
-      getReachMessage: (current: number, predicted: number, unit: string, trend: string) => {
-        if (trend === 'stable') return `👉 Stays at ${predicted}${unit}`;
-        if (trend === 'up') return `👉 May reach ${predicted}${unit}`;
-        return `👉 May drop to ${predicted}${unit}`;
+      getReachMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
+        const formatted = predicted.toFixed(1);
+        if (trend === 'stable') return `👉 Stays at ${formatted}%`;
+        if (trend === 'up') return `👉 May reach ${formatted}%`;
+        return `👉 May drop to ${formatted}%`;
       }
     },
     {
@@ -187,15 +208,18 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       rightBg: 'bg-green-50',
       rightText: 'text-green-600',
       borderColor: 'border-green-100',
-      getStatusMessage: (current: number, predicted: number, trend: string) => {
+      getStatusMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
         if (trend === 'stable') return 'Soil moisture steady';
         if (trend === 'up') return 'Soil getting wetter';
         return 'Soil getting drier';
       },
-      getReachMessage: (current: number, predicted: number, unit: string, trend: string) => {
-        if (trend === 'stable') return `👉 Stays at ${predicted}${unit}`;
-        if (trend === 'up') return `👉 May reach ${predicted}${unit}`;
-        return `👉 May drop to ${predicted}${unit}`;
+      getReachMessage: (current: number, predicted: number) => {
+        const trend = getActualTrend(current, predicted);
+        const formatted = predicted.toFixed(1);
+        if (trend === 'stable') return `👉 Stays at ${formatted}%`;
+        if (trend === 'up') return `👉 May reach ${formatted}%`;
+        return `👉 May drop to ${formatted}%`;
       }
     },
     {
@@ -210,17 +234,20 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       rightBg: 'bg-orange-50',
       rightText: 'text-orange-600',
       borderColor: 'border-orange-100',
-      getStatusMessage: (current: number, predicted: number, trend: string) => {
+      getStatusMessage: (current: number, predicted: number) => {
         if (current === 0 && predicted === 0) return 'No light data';
+        const trend = getActualTrend(current, predicted);
         if (trend === 'stable') return 'Light steady';
         if (trend === 'up') return 'Will get brighter';
         return 'Will get darker';
       },
-      getReachMessage: (current: number, predicted: number, unit: string, trend: string) => {
+      getReachMessage: (current: number, predicted: number) => {
         if (current === 0 && predicted === 0) return '👉 No light sensor';
-        if (trend === 'stable') return `👉 Stays at ${predicted.toFixed(0)} ${unit}`;
-        if (trend === 'up') return `👉 May reach ${predicted.toFixed(0)} ${unit}`;
-        return `👉 May drop to ${predicted.toFixed(0)} ${unit}`;
+        const trend = getActualTrend(current, predicted);
+        const formatted = predicted.toFixed(0);
+        if (trend === 'stable') return `👉 Stays at ${formatted} lux`;
+        if (trend === 'up') return `👉 May reach ${formatted} lux`;
+        return `👉 May drop to ${formatted} lux`;
       }
     },
     {
@@ -235,15 +262,16 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       rightBg: 'bg-purple-50',
       rightText: 'text-purple-600',
       borderColor: 'border-purple-100',
-      getStatusMessage: (current: number, predicted: number, trend: string) => {
+      getStatusMessage: (current: number, predicted: number) => {
         if (current === 0 && predicted === 0) return 'No air data';
+        const trend = getActualTrend(current, predicted);
         if (trend === 'stable') return 'Air quality steady';
         if (trend === 'up') return 'Air getting worse';
         return 'Air getting better';
       },
-      getReachMessage: (current: number, predicted: number, unit: string, trend: string) => {
+      getReachMessage: (current: number, predicted: number) => {
         if (current === 0 && predicted === 0) return '👉 No air quality data';
-        return getAirQualityTrendMessage(current, predicted, trend);
+        return getAirQualityTrendMessage(current, predicted);
       }
     },
   ];
@@ -298,7 +326,8 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
     );
   };
 
-  if (loading) {
+  // Show loading state
+  if (loading && !forecastData) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <div className="text-center py-8">
@@ -317,7 +346,7 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
         <div className="text-center py-8">
           <p className="text-red-500 text-sm">{error || 'No forecast available'}</p>
-          <button onClick={fetchForecast} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
+          <button onClick={handleRefresh} className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
             Try Again
           </button>
         </div>
@@ -333,12 +362,37 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
           <h2 className="text-[30px] font-bold text-gray-900 leading-tight">Next Hour Forecast</h2>
           <p className="text-sm text-gray-600 mt-1">What to expect in the next hour</p>
         </div>
-        {forecastData.weatherUsed && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 border border-blue-100">
-            <span className="text-lg">🌤️</span>
-            <span className="text-sm font-semibold text-blue-600">Using weather data</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {forecastData.weatherUsed && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 border border-blue-100">
+              <span className="text-lg">🌤️</span>
+              <span className="text-sm font-semibold text-blue-600">Using weather data</span>
+            </div>
+          )}
+          {/* Refresh Button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg 
+              className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" 
+              />
+            </svg>
+            <span className="text-sm font-medium text-gray-700">
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Forecast Rows - Farmer friendly */}
@@ -347,11 +401,14 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
           const data = metric.getData();
           if (!data) return null;
 
-          const effectiveTrend = Math.abs(data.current - data.predicted) < 0.01 ? 'stable' : data.trend;
+          // Calculate trend based on ACTUAL difference between current and predicted
+          const actualTrend = getActualTrend(data.current, data.predicted);
           
           const timeSeriesData = generateTimeSeriesData(data.current, data.predicted);
-          const statusMessage = metric.getStatusMessage(data.current, data.predicted, effectiveTrend);
-          const reachMessage = metric.getReachMessage(data.current, data.predicted, metric.unit, effectiveTrend);
+          
+          // Get status and reach messages using actual current/predicted values
+          const statusMessage = metric.getStatusMessage(data.current, data.predicted);
+          const reachMessage = metric.getReachMessage(data.current, data.predicted);
 
           const showTrendArrow = !(metric.id === 'lux' && data.current === 0 && data.predicted === 0);
           const specialIcon = (metric.id === 'lux' && data.current === 0 && data.predicted === 0) ? '⚠️' : null;
@@ -375,7 +432,7 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
                 <div className="text-[28px] font-bold text-gray-900 mt-2 leading-none">{data.current}</div>
               </div>
 
-              {/* Chart */}
+              {/* Chart  */}
               <div className="min-w-0">
                 <ForecastLineChart data={timeSeriesData} color={metric.lineColor} fillColor={metric.fillColor} />
               </div>
@@ -386,7 +443,7 @@ export function ForecastView({ sensorId = 'GH001', lat = 6.9271, lon = 79.8612 }
                   {specialIcon ? (
                     <span className="text-2xl">{specialIcon}</span>
                   ) : showTrendArrow ? (
-                    <TrendArrow trend={effectiveTrend} colorClass={metric.rightText} />
+                    <TrendArrow trend={actualTrend} colorClass={metric.rightText} />
                   ) : (
                     <span className="text-2xl">📊</span>
                   )}

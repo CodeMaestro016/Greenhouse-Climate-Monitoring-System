@@ -104,8 +104,9 @@ export function DashboardAlerts({ onOpenAlert }: DashboardAlertsProps) {
       end.setHours(23, 59, 59, 999);
 
       const response = await fetch(
-        `/api/alerts?limit=200&startDate=${start.toISOString()}&endDate=${end.toISOString()}`
+        `/api/alerts?limit=200&startDate`
       );
+      
 
       if (!response.ok) throw new Error("Failed to fetch alerts");
 
