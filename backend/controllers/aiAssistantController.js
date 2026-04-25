@@ -502,5 +502,9 @@ const getAIStatus = async (req, res) => {
 module.exports = {
   chatWithAI,
   getConversationHistory,
-  getAIStatus
+  getAIStatus,
+  getLatestSensorData,
+  getHistoricalSensorData,
+  getDailyAggregates,
+  getSensorTrends
 };

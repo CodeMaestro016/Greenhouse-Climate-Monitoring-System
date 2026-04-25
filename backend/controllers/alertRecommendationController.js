@@ -2,9 +2,11 @@ const axios = require('axios');
 const aiAssistantController = require('./aiAssistantController');
 
 /**
- * Generate AI-powered recommendation for alert
+ * Generate AI-powered recommendation for alert with retry logic
  */
-const generateRecommendation = async (alert) => {
+const generateRecommendation = async (alert, retryCount = 0) => {
+  const maxRetries = 2;
+  
   try {
     // Check if OpenAI API key is available
     if (!process.env.OPENAI_API_KEY) {
@@ -77,7 +79,7 @@ Provide ONLY the action, nothing else:`;
           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        timeout: 5000
+        timeout: 15000
       }
     );
 
@@ -91,7 +93,20 @@ Provide ONLY the action, nothing else:`;
 
     return recommendation;
   } catch (error) {
-    console.error('Error generating AI recommendation:', error.message);
+    console.error('Error generating AI recommendation (attempt', retryCount + 1, '):', error.message);
+    
+    // Retry logic for timeouts and server errors
+    if (retryCount < maxRetries && 
+        (error.code === 'ECONNRESET' || 
+         error.code === 'ETIMEDOUT' || 
+         error.response?.status >= 500)) {
+      console.log(`Retrying AI recommendation (${retryCount + 1}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+      return generateRecommendation(alert, retryCount + 1);
+    }
+    
+    // Use fallback on final failure
+    console.log('Using fallback recommendation due to API failure');
     return getFallbackRecommendation(alert);
   }
 };
