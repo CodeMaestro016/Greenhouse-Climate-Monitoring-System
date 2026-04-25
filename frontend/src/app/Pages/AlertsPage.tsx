@@ -296,7 +296,7 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
       setError(null);
 
-      const response = await fetch('/api/alerts?limit=100');
+      const response = await fetch('/api/alerts?limit=100000');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -329,18 +329,35 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
     await fetchAlerts(true);
   };
 
-  const fetchRecommendation = async (alertId: string) => {
-    if (recommendations[alertId] || loadingRecommendations[alertId]) {
-      return; // Already fetched or loading
-    }
-
-    setLoadingRecommendations(prev => ({ ...prev, [alertId]: true }));
-    
+  const handleClearAllAlerts = async () => {
     try {
+      const response = await fetch('/api/alerts', {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Clear local state
+      setAlerts([]);
+      setRecommendations({});
+    } catch (err) {
+      console.error('Error clearing alerts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to clear alerts');
+    }
+  };
+
+  const fetchRecommendation = async (alertId: string) => {
+    try {
+      setLoadingRecommendations(prev => ({ ...prev, [alertId]: true }));
+      
       const recommendation = await getAlertRecommendation(alertId);
+      
       setRecommendations(prev => ({ ...prev, [alertId]: recommendation }));
-    } catch (error) {
-      console.error('Error fetching recommendation:', error);
+    } catch (err) {
+      console.error('Error fetching recommendation:', err);
+      // Don't set error state for recommendation failures, just log it
     } finally {
       setLoadingRecommendations(prev => ({ ...prev, [alertId]: false }));
     }
@@ -669,7 +686,15 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <h3 className="text-xl font-semibold text-gray-800">Alert History</h3>
+
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearAllAlerts}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+                >
+                  Clear All
+                </button>
+
                 <select
                   value={historySeverityFilter}
                   onChange={(e) => setHistorySeverityFilter(e.target.value)}
@@ -681,6 +706,7 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
+
                 <select
                   value={historyTimeFilter}
                   onChange={(e) => setHistoryTimeFilter(e.target.value as any)}
