@@ -1,14 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Bell, Leaf } from "lucide-react";
-
-type AlertNotification = {
-  _id: string;
-  title: string;
-  message: string;
-  severity: "critical" | "high" | "medium" | "low" | "info";
-  timestamp: string;
-  createdAt?: string;
-};
+import { useAppStore } from "../store/appStore";
 
 type DashboardAlertsProps = {
   onOpenAlert?: (alert: {
@@ -73,9 +65,33 @@ const getSeverityStyle = (severity: string) => {
   }
 };
 
+const alertsChanged = (
+  currentAlerts: Array<{ _id: string; timestamp: string; createdAt?: string }>,
+  newAlerts: Array<{ _id: string; timestamp: string; createdAt?: string }>
+) => {
+  if (currentAlerts.length !== newAlerts.length) return true;
+
+  for (let i = 0; i < currentAlerts.length; i += 1) {
+    const current = currentAlerts[i];
+    const incoming = newAlerts[i];
+
+    if (
+      current._id !== incoming._id ||
+      current.timestamp !== incoming.timestamp ||
+      current.createdAt !== incoming.createdAt
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 export function DashboardAlerts({ onOpenAlert }: DashboardAlertsProps) {
-  const [alerts, setAlerts] = useState<AlertNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const alerts = useAppStore((state) => state.dashboardAlerts);
+  const loading = useAppStore((state) => state.dashboardAlertsLoading);
+  const setAlerts = useAppStore((state) => state.setDashboardAlerts);
+  const setLoading = useAppStore((state) => state.setDashboardAlertsLoading);
 
   const fetchTodayAlerts = async (showLoading = false) => {
     try {
@@ -88,20 +104,18 @@ export function DashboardAlerts({ onOpenAlert }: DashboardAlertsProps) {
       end.setHours(23, 59, 59, 999);
 
       const response = await fetch(
-        `/api/alerts?limit=100000&startDate=${start.toISOString()}&endDate=${end.toISOString()}`
+        `/api/alerts?limit=200&startDate=${start.toISOString()}&endDate=${end.toISOString()}`
       );
 
       if (!response.ok) throw new Error("Failed to fetch alerts");
 
       const result = await response.json();
       const newAlerts = result.data || [];
+      const currentAlerts = useAppStore.getState().dashboardAlerts;
 
-      setAlerts((prev) => {
-        if (JSON.stringify(prev) !== JSON.stringify(newAlerts)) {
-          return newAlerts;
-        }
-        return prev;
-      });
+      if (alertsChanged(currentAlerts, newAlerts)) {
+        setAlerts(newAlerts);
+      }
     } catch (error) {
       console.error("Error fetching dashboard alerts:", error);
     } finally {
@@ -110,11 +124,11 @@ export function DashboardAlerts({ onOpenAlert }: DashboardAlertsProps) {
   };
 
   useEffect(() => {
-    fetchTodayAlerts(true);
+    fetchTodayAlerts(alerts.length === 0);
 
     const interval = window.setInterval(() => {
       fetchTodayAlerts(false);
-    }, 2000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'; 
+import { useQuery } from '@tanstack/react-query';
 import { 
   Thermometer, Droplets, Sprout, Sun, Wind, TrendingUp, 
   TrendingDown, XCircle, AlertCircle, CheckCircle, Wifi, WifiOff, Activity
@@ -237,58 +238,31 @@ function SensorCard({
 }
 
 export function DashboardPage({ dangerLevel, onOpenAlert }: DashboardPageProps) {
-  const [dashboardRecords, setDashboardRecords] = useState<SensorRecord[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const [currentSensorId, setCurrentSensorId] = useState<string>('GH001');
+  
   const [coordinates] = useState({ lat: 6.9271, lon: 79.8612 });
   
-  // Force re-render every second for time-ago updates
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setDashboardRecords(prev => [...prev]);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch dashboard data
-  useEffect(() => {
-    let cancelled = false;
-    let retryTimeout: number | undefined;
-
-    const fetchDashboardData = async () => {
-      try {
-        const response = await fetch('/api/sensors?limit=180');
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
-        }
+  const dashboardQuery = useQuery<SensorRecord[]>({
+    queryKey: ['dashboard-sensors', 180],
+    queryFn: async () => {
+      const response = await fetch('/api/sensors?limit=180');
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
 
         const payload = await response.json();
-        if (!cancelled && Array.isArray(payload)) {
-          setDashboardRecords(payload);
-          setIsConnected(true);
-          if (payload.length > 0 && payload[0].sensorId) {
-            setCurrentSensorId(payload[0].sensorId);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching sensor data:', error);
-        if (!cancelled) {
-          setIsConnected(false);
-          setDashboardRecords([]);
-          retryTimeout = window.setTimeout(fetchDashboardData, 2000);
-        }
-      }
-    };
+        return Array.isArray(payload) ? payload : [];
+    },
+    refetchInterval: 5000,
+    staleTime: 4000,
+    gcTime: 30 * 60 * 1000
+  });
 
-    fetchDashboardData();
-    const interval = window.setInterval(fetchDashboardData, 2000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      if (retryTimeout) clearTimeout(retryTimeout);
-    };
-  }, []);
+  const dashboardRecords = dashboardQuery.data ?? [];
+  const isConnected = !dashboardQuery.isError;
+  const currentSensorId = dashboardRecords[0]?.sensorId || 'GH001';
+        
+        
+  
 
   // Parse and process sensor records
   const parsedRows = useMemo(

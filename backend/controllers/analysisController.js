@@ -2,6 +2,71 @@ const SensorData = require("../models/Sensor");
 const { spawn } = require("child_process");
 const path = require("path");
 
+const PRIMARY_COLLECTION   = "sensorData";
+const SECONDARY_COLLECTION = process.env.SECONDARY_SENSOR_COLLECTION;
+
+// Parse timestamps that may be Date objects or strings like "1/1/2025 0:20"
+function parseTs(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) return d;
+  const match = String(value).trim().match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  if (!match) return null;
+  const [, day, month, year, h = "0", m = "0", s = "0"] = match;
+  const result = new Date(Date.UTC(+year, +month - 1, +day, +h, +m, +s));
+  return isNaN(result.getTime()) ? null : result;
+}
+
+// Query both primary and secondary collections and return merged docs sorted
+// by timestamp ascending — mirrors the approach in sensorController.js
+async function fetchDocsFromBothCollections(sensorId, limit) {
+  const db = SensorData.db;
+  const n  = Math.max(1, Number(limit) || 100);
+
+  // Primary: Mongoose model collection — documents have nested readings
+  const primaryDocs = await db.collection(PRIMARY_COLLECTION)
+    .find({ sensorId })
+    .sort({ timestamp: 1 })
+    .limit(n)
+    .toArray();
+
+  // Secondary: raw collection — documents store values at top level
+  let secondaryDocs = [];
+  if (
+    SECONDARY_COLLECTION &&
+    typeof SECONDARY_COLLECTION === "string" &&
+    SECONDARY_COLLECTION.trim() &&
+    SECONDARY_COLLECTION.trim() !== PRIMARY_COLLECTION
+  ) {
+    secondaryDocs = await db.collection(SECONDARY_COLLECTION.trim())
+      .find({ sensorId })
+      .sort({ timestamp: 1 })
+      .limit(n)
+      .toArray();
+  }
+
+  // Deduplicate by _id then sort ascending by parsed timestamp
+  const seen = new Map();
+  for (const doc of [...primaryDocs, ...secondaryDocs]) {
+    const key = doc._id ? String(doc._id) : `${doc.sensorId}-${doc.timestamp}`;
+    if (!seen.has(key)) seen.set(key, doc);
+  }
+
+  return Array.from(seen.values())
+    .sort((a, b) => {
+      const ta = parseTs(a.timestamp);
+      const tb = parseTs(b.timestamp);
+      if (!ta && !tb) return 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ta - tb;
+    })
+    .slice(0, n);
+}
+
 const FIELD_ALIASES = {
   light: "lux",
   mq135_raw: "airppm"
@@ -23,7 +88,14 @@ function resolveFieldName(field) {
 
 function readFieldValue(doc, field) {
   const resolvedField = resolveFieldName(field);
-  return doc.readings?.[resolvedField];
+    // 1. Try alias-resolved field in readings (e.g. readings.lux for 'light')
+  const fromReadingsResolved = doc.readings?.[resolvedField];
+  if (fromReadingsResolved !== undefined && fromReadingsResolved !== null) return fromReadingsResolved;
+  // 2. Try original field name in readings (e.g. readings.light for 'light')
+  const fromReadingsOriginal = doc.readings?.[field];
+  if (fromReadingsOriginal !== undefined && fromReadingsOriginal !== null) return fromReadingsOriginal;
+  // 3. Fall back to top-level fields (secondary collection stores values at root level)
+  return doc[resolvedField] ?? doc[field] ?? null;
 }
 
 function detectAnomaliesWithZScore(values, zThreshold = 2.5) {
@@ -109,9 +181,8 @@ const getTrendAnalysis = async (req, res) => {
       });
     }
 
-    const docs = await SensorData.find({ sensorId })
-      .sort({ timestamp: 1 })
-      .limit(Number(limit));
+    const docs = await fetchDocsFromBothCollections(sensorId, limit);
+
 
     const data = docs
       .map((doc) => ({
@@ -168,9 +239,7 @@ const getCorrelationAnalysis = async (req, res) => {
       });
     }
 
-    const docs = await SensorData.find({ sensorId })
-      .sort({ timestamp: 1 })
-      .limit(Number(limit));
+    const docs = await fetchDocsFromBothCollections(sensorId, limit);
 
     const data = docs
       .map((doc) => ({
@@ -246,9 +315,7 @@ const getMLAnomalyAnalysis = async (req, res) => {
       return res.status(400).json({ message: "Invalid field name" });
     }
 
-    const docs = await SensorData.find({ sensorId })
-      .sort({ timestamp: 1 })
-      .limit(Number(limit));
+    const docs = await fetchDocsFromBothCollections(sensorId, limit);
 
     const data = docs
       .map((doc) => ({
