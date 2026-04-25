@@ -293,7 +293,7 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
       setError(null);
 
-      const response = await fetch('/api/alerts?limit=100');
+      const response = await fetch('/api/alerts?limit=100000');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -324,6 +324,25 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAlerts(true);
+  };
+
+  const handleClearAllAlerts = async () => {
+    if (!confirm("Are you sure you want to delete ALL alerts? This action cannot be undone.")) return;
+
+    try {
+      const res = await fetch("/api/alerts/clear", {
+        method: "DELETE"
+      });
+
+      const data = await res.json();
+      console.log(data.message);
+      
+      // Refresh the alerts list
+      await fetchAlerts(true);
+    } catch (err) {
+      console.error("Failed to clear alerts", err);
+      alert("Failed to clear alerts. Please try again.");
+    }
   };
 
   const toggleChartSeverity = (severity: string) => {
@@ -649,7 +668,15 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
               <h3 className="text-xl font-semibold text-gray-800">Alert History</h3>
+
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleClearAllAlerts}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm transition-colors"
+                >
+                  Clear All
+                </button>
+
                 <select
                   value={historySeverityFilter}
                   onChange={(e) => setHistorySeverityFilter(e.target.value)}
@@ -661,6 +688,7 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
                   <option value="medium">Medium</option>
                   <option value="low">Low</option>
                 </select>
+
                 <select
                   value={historyTimeFilter}
                   onChange={(e) => setHistoryTimeFilter(e.target.value as any)}
