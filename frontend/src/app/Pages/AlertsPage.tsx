@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { AlertReport } from './AlertReport';
 import { useAppStore, type AlertsPageAlert } from '../store/appStore';
+import { getAlertRecommendation, AlertRecommendation } from '../services/alertRecommendationService';
 
 // Alert interface matching backend schema
 interface Alert {
@@ -286,6 +287,8 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const setLoading = useAppStore((state) => state.setAlertsPageLoading);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [recommendations, setRecommendations] = useState<{ [key: string]: AlertRecommendation }>({});
+  const [loadingRecommendations, setLoadingRecommendations] = useState<{ [key: string]: boolean }>({});
 
   // Auto refresh every 5 seconds
   useEffect(() => {
@@ -351,21 +354,36 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   };
 
   const handleClearAllAlerts = async () => {
-    if (!confirm("Are you sure you want to delete ALL alerts? This action cannot be undone.")) return;
-
     try {
-      const res = await fetch("/api/alerts/clear", {
-        method: "DELETE"
+      const response = await fetch('/api/alerts/clear', {
+        method: 'DELETE',
       });
-
-      const data = await res.json();
-      console.log(data.message);
       
-      // Refresh the alerts list
-      await fetchAlerts(true);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      // Clear local state
+      setAlerts([]);
+      setRecommendations({});
     } catch (err) {
-      console.error("Failed to clear alerts", err);
-      alert("Failed to clear alerts. Please try again.");
+      console.error('Error clearing alerts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to clear alerts');
+    }
+  };
+
+  const fetchRecommendation = async (alertId: string) => {
+    try {
+      setLoadingRecommendations(prev => ({ ...prev, [alertId]: true }));
+      
+      const recommendation = await getAlertRecommendation(alertId);
+      
+      setRecommendations(prev => ({ ...prev, [alertId]: recommendation }));
+    } catch (err) {
+      console.error('Error fetching recommendation:', err);
+      // Don't set error state for recommendation failures, just log it
+    } finally {
+      setLoadingRecommendations(prev => ({ ...prev, [alertId]: false }));
     }
   };
 
@@ -793,14 +811,50 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
 
                         <div className={`mt-4 rounded-lg p-3 border ${boxColors.actionBorder} ${boxColors.actionBg}`}>
                           <div className="flex items-start gap-2">
-                            <ArrowRight className={`w-4 h-4 ${boxColors.actionText} mt-0.5`} />
                             <div className="flex-1">
-                              <p className={`text-xs font-medium ${boxColors.actionText}`}>Recommended Action:</p>
-                              <p className={`text-sm ${boxColors.actionText}`}>
-                                {isLow ? `Increase ${getSensorDisplayName(alert.field).toLowerCase()} to optimal range (${min}-${max}${unit})` :
-                                 isHigh ? `Reduce ${getSensorDisplayName(alert.field).toLowerCase()} to optimal range (${min}-${max}${unit})` :
-                                 `Maintain current ${getSensorDisplayName(alert.field).toLowerCase()} levels`}
-                              </p>
+                              {/* Recommendation Button */}
+                              {!recommendations[alert._id] && (
+                                <button
+                                  onClick={() => fetchRecommendation(alert._id)}
+                                  disabled={loadingRecommendations[alert._id]}
+                                  className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
+                                    loadingRecommendations[alert._id] 
+                                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                                      : `${boxColors.actionBg} ${boxColors.actionText} hover:opacity-80 border ${boxColors.actionBorder}`
+                                  }`}
+                                >
+                                  {loadingRecommendations[alert._id] ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                      <div className={`w-4 h-4 border ${boxColors.actionText.replace('text-', 'border-')} border-t-transparent animate-spin rounded-full`}></div>
+                                      Getting recommendation...
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center justify-center gap-2">
+                                      <span className={`w-2 h-2 ${boxColors.actionText.replace('text-', 'bg-')} rounded-full`}></span>
+                                      Get Recommendation
+                                    </span>
+                                  )}
+                                </button>
+                              )}
+                              
+                              {/* Display recommendation if available */}
+                              {recommendations[alert._id] && (
+                                <div className={`p-3 ${boxColors.actionBg} border ${boxColors.actionBorder} rounded-lg`}>
+                                  <div className="flex items-start gap-3">
+                                    <div className="w-5 h-5 flex-shrink-0 mt-0.5">
+                                      <div className={`w-full h-full ${boxColors.badgeBg} rounded-full flex items-center justify-center`}>
+                                        <span className="text-white text-xs font-bold">!</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className={`text-sm font-medium ${boxColors.actionText} mb-1`}>Recommendation Action:</p>
+                                      <p className={`${boxColors.actionText}`}>
+                                        {recommendations[alert._id].recommendation}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

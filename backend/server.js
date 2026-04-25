@@ -66,6 +66,7 @@ app.use("/api/analysis", require("./routes/analysisRoutes"));
 app.use("/api/ai-assistant", require("./routes/aiAssistantRoutes"));
 app.use("/api/forecast", require("./routes/forecastRoutes"));
 app.use("/api/alerts", require("./routes/alertRoutes"));
+app.use("/api/alert-recommendations", require("./routes/alertRecommendationRoutes"));
 
 const PORT = process.env.PORT || 5000;
 
