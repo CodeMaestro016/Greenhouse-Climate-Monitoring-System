@@ -1,4 +1,5 @@
 const SensorData = require("../models/Sensor");
+const { checkAndCreateAlerts } = require("./alertController");
 
 const parseLimit = (value, defaultLimit) => {
   if (value === undefined || value === null || value === "") {
@@ -10,7 +11,6 @@ const parseLimit = (value, defaultLimit) => {
     return defaultLimit;
   }
 
-  // limit=0 means "no limit" for full-history views.
   if (n === 0) {
     return null;
   }
@@ -18,14 +18,36 @@ const parseLimit = (value, defaultLimit) => {
   return Math.min(Math.floor(n), 50000);
 };
 
+// Create new sensor data + create alerts
+const createSensorData = async (req, res) => {
+  try {
+    const newSensorData = await SensorData.create(req.body);
+
+    const alerts = await checkAndCreateAlerts(newSensorData.toObject());
+
+    res.status(201).json({
+      success: true,
+      message: "Sensor data saved successfully",
+      data: newSensorData,
+      alertsCreated: alerts.length,
+      alerts
+    });
+  } catch (error) {
+    console.error("Error creating sensor data:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get all sensor data
 const getAllSensorData = async (req, res) => {
   try {
     const limit = parseLimit(req.query.limit, 15000);
     const query = SensorData.find().sort({ timestamp: -1 });
+
     if (limit !== null) {
       query.limit(limit);
     }
+
     const data = await query;
     res.json(data);
   } catch (error) {
@@ -48,10 +70,13 @@ const getSensorDataById = async (req, res) => {
   try {
     const { sensorId } = req.params;
     const limit = parseLimit(req.query.limit, 15000);
+
     const query = SensorData.find({ sensorId }).sort({ timestamp: -1 });
+
     if (limit !== null) {
       query.limit(limit);
     }
+
     const data = await query;
     res.json(data);
   } catch (error) {
@@ -59,10 +84,11 @@ const getSensorDataById = async (req, res) => {
   }
 };
 
-// Get dataset stats (count, oldest, newest)
+// Get dataset stats
 const getSensorStats = async (req, res) => {
   try {
     const match = {};
+
     if (req.query.sensorId) {
       match.sensorId = String(req.query.sensorId);
     }
@@ -81,8 +107,16 @@ const getSensorStats = async (req, res) => {
 
     res.json(
       result
-        ? { count: result.count, oldest: result.oldest, newest: result.newest }
-        : { count: 0, oldest: null, newest: null }
+        ? {
+            count: result.count,
+            oldest: result.oldest,
+            newest: result.newest
+          }
+        : {
+            count: 0,
+            oldest: null,
+            newest: null
+          }
     );
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -90,6 +124,7 @@ const getSensorStats = async (req, res) => {
 };
 
 module.exports = {
+  createSensorData,
   getAllSensorData,
   getLatestSensorData,
   getSensorStats,
