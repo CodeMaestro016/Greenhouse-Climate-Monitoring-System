@@ -1,0 +1,446 @@
+/**
+ * App.tsx - Main application component for Greenhouse Climate Monitoring System
+ *
+ * Performance fixes applied:
+ * - Pages are conditionally rendered (unmounted when not active) instead of hidden with CSS.
+ *   This stops DashboardPage's 5-second polling from running while on other pages.
+ * - conversationId is initialised once via useState initialiser to eliminate the
+ *   race-condition where two rapid messages generated two different IDs.
+ * - React.lazy + Suspense wraps the three non-default pages so their JS is only
+ *   downloaded and parsed when the user first navigates to them.
+ */
+
+import { lazy, Suspense, useEffect, useState } from 'react';
+import {
+  Home, BarChart3, AlertTriangle, History,
+  Bell, Settings, Sprout, MessageCircle, Bot,
+  Sparkles, Send, X, Minimize2, Maximize2
+} from 'lucide-react';
+import { DashboardPage } from './Pages/DashboardPage';
+import { chatWithAI, generateSessionId } from './services/aiAssistantService';
+
+const greenhouseHero = new URL('./components/assests/greenhouse-hero.jpg', import.meta.url).href;
+
+type ViewType = 'dashboard' | 'analytics' | 'alerts' | 'history';
+
+// Lazy-load pages that are not shown on startup
+const importAnalyticsPage = () => import('./Pages/AnalyticsPage');
+const importAlertsPage = () => import('./Pages/AlertsPage');
+const importHistoryPage = () => import('./Pages/HistoryPage');
+
+const AnalyticsPage = lazy(() => importAnalyticsPage().then(m => ({ default: m.AnalyticsPage })));
+const AlertsPage = lazy(() => importAlertsPage().then(m => ({ default: m.AlertsPage })));
+const HistoryPage = lazy(() => importHistoryPage().then(m => ({ default: m.HistoryPage })));
+
+const assistantQuickQuestions = [
+  'Why is temperature rising?',
+  'Is my lettuce safe today?',
+  'What should I do now?',
+  'Show last 7 day humidity trend',
+];
+
+// Simple spinner shown while a lazy page loads for the first time
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center py-24 text-emerald-600 gap-3">
+      <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24" fill="none">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+      </svg>
+      <span className="text-sm font-medium">Loading...</span>
+    </div>
+  );
+}
+
+function App() {
+  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantFullscreen, setAssistantFullscreen] = useState(false);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantTab, setAssistantTab] = useState<'chat' | 'search' | 'contact'>('chat');
+  const [assistantMessages, setAssistantMessages] = useState([
+    { id: 1, role: 'assistant', text: 'I am here to answer greenhouse questions in plain language. Try one of the quick questions below.' },
+  ]);
+
+  // FIX: Initialise conversationId once so rapid double-sends don't generate two different IDs
+  const [conversationId] = useState(
+    () => `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  );
+  const [sessionId] = useState(() => generateSessionId());
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
+
+  const dangerLevel = 62;
+
+  const preloadView = (view: ViewType) => {
+    if (view === 'analytics') {
+      void importAnalyticsPage();
+      return;
+    }
+    if (view === 'alerts') {
+      void importAlertsPage();
+      return;
+    }
+    if (view === 'history') {
+      void importHistoryPage();
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      preloadView('history');
+    }, 1200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  const handleNavigate = (view: ViewType) => {
+    preloadView(view);
+    setCurrentView(view);
+  };
+
+  const sendAssistantMessage = async (questionText?: string) => {
+    const question = (questionText ?? assistantInput).trim();
+    if (!question || isLoadingAI) return;
+
+    setAssistantMessages(prev => [...prev, { id: Date.now(), role: 'user', text: question }]);
+    setAssistantInput('');
+    setIsLoadingAI(true);
+
+    try {
+      const response = await chatWithAI(question, conversationId, sessionId);
+      setAssistantMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: 'assistant',
+          text: response.success ? response.response : 'Sorry, I encountered an error. Please try again.',
+        },
+      ]);
+    } catch {
+      setAssistantMessages(prev => [
+        ...prev,
+        { id: Date.now() + 1, role: 'assistant', text: "Sorry, I'm having trouble connecting right now. Please try again in a moment." },
+      ]);
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
+
+  const handleOpenAlert = () => {
+    setSelectedAlertId(null);
+    setCurrentView('alerts');
+  };
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
+    { id: 'history', label: 'History', icon: History },
+  ];
+
+  return (
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-50/90 via-emerald-50/80 to-lime-50/90" />
+        <img
+          src={greenhouseHero}
+          alt="Greenhouse Background"
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-green-100/30 via-transparent to-green-50/20" />
+      </div>
+
+      {/* Header */}
+      <header className="relative z-10 glass-morphism border-b border-green-200/20 px-6 py-4 sticky top-0 backdrop-blur-md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+              <Sprout className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-xl text-gray-800 tracking-tight">Mochiforge Greenhouse Monitor</h1>
+              <p className="text-sm text-green-700 font-medium">
+                {currentView === 'dashboard' && 'Climate Control Dashboard'}
+                {currentView === 'analytics' && 'Advanced Analytics'}
+                {currentView === 'alerts' && 'Alerts Management'}
+                {currentView === 'history' && 'Historical Sensor Data'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:scale-105">
+              <Bell className="w-5 h-5" />
+            </button>
+            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:scale-105">
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex relative z-10">
+        {/* Desktop Sidebar */}
+        <aside className="w-64 glass-morphism border-r border-green-200/20 min-h-[calc(100vh-89px)] p-4 sticky top-[89px] backdrop-blur-md hidden lg:block">
+          <nav className="space-y-2">
+            {navItems.map(({ id, label, icon: Icon }) => {
+              const isActive = currentView === id;
+              return (
+                <button
+                  key={id}
+                  onMouseEnter={() => preloadView(id as ViewType)}
+                  onFocus={() => preloadView(id as ViewType)}
+                  onTouchStart={() => preloadView(id as ViewType)}
+                  onClick={() => handleNavigate(id as ViewType)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm ${
+                    isActive
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg transform scale-105'
+                      : 'text-green-700 hover:bg-green-100/50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Mobile bottom nav */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass-morphism border-t border-green-200/20 backdrop-blur-md">
+          <nav className="flex justify-around py-2">
+            {navItems.map(({ id, label, icon: Icon }) => {
+              const isActive = currentView === id;
+              return (
+                <button
+                  key={id}
+                  onMouseEnter={() => preloadView(id as ViewType)}
+                  onFocus={() => preloadView(id as ViewType)}
+                  onTouchStart={() => preloadView(id as ViewType)}
+                  onClick={() => handleNavigate(id as ViewType)}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all text-xs ${
+                    isActive ? 'text-green-600 bg-green-100/50' : 'text-green-700 hover:bg-green-100/30'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="text-xs font-medium">{label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Main content */}
+        <main className="flex-1 p-4 lg:p-6 relative pb-20 lg:pb-6">
+          <div className="hero-gradient rounded-2xl p-1 mb-6">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 lg:p-6">
+
+              {/* FIX: Conditional rendering instead of CSS hidden.
+                  Pages unmount when not active so DashboardPage's 5s polling stops,
+                  and History/Analytics/Alerts are only mounted when the user visits them. */}
+
+              {currentView === 'dashboard' && (
+                <DashboardPage dangerLevel={dangerLevel} onOpenAlert={handleOpenAlert} />
+              )}
+
+              {currentView === 'analytics' && (
+                <Suspense fallback={<PageLoader />}>
+                  <AnalyticsPage />
+                </Suspense>
+              )}
+
+              {currentView === 'alerts' && (
+                <Suspense fallback={<PageLoader />}>
+                  <AlertsPage selectedAlertId={selectedAlertId} />
+                </Suspense>
+              )}
+
+              {currentView === 'history' && (
+                <Suspense fallback={<PageLoader />}>
+                  <HistoryPage />
+                </Suspense>
+              )}
+
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* AI Assistant button */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setAssistantOpen(!assistantOpen)}
+          className="group relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-700 text-white shadow-lg transition-transform hover:scale-105"
+        >
+          <MessageCircle className="h-6 w-6" />
+          <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-emerald-700">
+            AI
+          </span>
+        </button>
+      </div>
+
+      {/* AI Assistant modal */}
+      {assistantOpen && (
+        <div className="fixed inset-0 z-40 pointer-events-none">
+          <div
+            className="absolute inset-0 bg-black/10"
+            onClick={() => { setAssistantOpen(false); setAssistantFullscreen(false); }}
+          />
+          <div className={`pointer-events-auto border border-emerald-100 bg-white shadow-xl ${
+            assistantFullscreen
+              ? 'absolute inset-3 rounded-2xl md:inset-6'
+              : 'absolute right-3 bottom-24 h-[560px] w-[calc(100%-1.5rem)] max-w-[400px] rounded-2xl md:right-6'
+          }`}>
+            <div className="h-1 rounded-t-2xl bg-gradient-to-r from-emerald-500 to-green-500" />
+
+            <div className="flex h-12 items-center justify-between border-b border-gray-200 px-4">
+              <div className="flex items-center gap-2">
+                <div className="rounded-md bg-emerald-50 p-1.5 text-emerald-700">
+                  <Bot className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-sm font-semibold text-gray-800">AI Assistant</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setAssistantFullscreen(!assistantFullscreen)}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
+                >
+                  {assistantFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                </button>
+                <button
+                  onClick={() => { setAssistantOpen(false); setAssistantFullscreen(false); }}
+                  className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="h-[calc(100%-48px)] flex flex-col">
+              <div className="border-b border-gray-100 px-3 py-2">
+                <div className="flex gap-1 rounded-lg bg-gray-100 p-1 text-xs">
+                  {(['chat', 'search', 'contact'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setAssistantTab(tab)}
+                      className={`flex-1 rounded-md px-2 py-1.5 transition-colors ${
+                        assistantTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'hover:bg-white/60'
+                      }`}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {assistantTab === 'chat' ? (
+                <>
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <div className="flex flex-wrap gap-1.5">
+                      {assistantQuickQuestions.map(q => (
+                        <button
+                          key={q}
+                          onClick={() => sendAssistantMessage(q)}
+                          disabled={isLoadingAI}
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                            isLoadingAI
+                              ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-gray-50 px-3 py-3 space-y-2">
+                    {assistantMessages.map(msg => (
+                      <div
+                        key={msg.id}
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+                          msg.role === 'assistant'
+                            ? 'bg-white border border-gray-200 text-gray-700'
+                            : 'ml-auto bg-emerald-600 text-white'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    ))}
+                    {isLoadingAI && (
+                      <div className="max-w-[85%] rounded-xl px-3 py-2 text-sm bg-white border border-gray-200 text-gray-700">
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            {[0, 150, 300].map(delay => (
+                              <div
+                                key={delay}
+                                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                                style={{ animationDelay: `${delay}ms` }}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-gray-500">Thinking...</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border-t border-gray-200 px-3 py-2">
+                    <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1">
+                      <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                      <input
+                        value={assistantInput}
+                        onChange={e => setAssistantInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendAssistantMessage()}
+                        placeholder="Ask me a question..."
+                        disabled={isLoadingAI}
+                        className={`flex-1 border-none bg-transparent text-sm text-gray-700 outline-none ${isLoadingAI ? 'opacity-50' : ''}`}
+                      />
+                      <button
+                        onClick={() => sendAssistantMessage()}
+                        disabled={isLoadingAI}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 ${isLoadingAI ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : assistantTab === 'search' ? (
+                <div className="flex-1 p-4">
+                  <h4 className="text-sm font-semibold text-gray-800">Quick Search</h4>
+                  <p className="text-xs text-gray-500 mt-1">Use Chat tab for full conversation</p>
+                  <div className="mt-3 space-y-2">
+                    {[
+                      'Show last 7 day humidity trend',
+                      'Why is temperature rising?',
+                    ].map(q => (
+                      <button
+                        key={q}
+                        onClick={() => { setAssistantTab('chat'); sendAssistantMessage(q); }}
+                        className="block w-full rounded-lg border border-gray-200 px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 p-4">
+                  <h4 className="text-sm font-semibold text-gray-800">Support Contact</h4>
+                  <p className="text-sm text-gray-600 mt-2">Need human support? Contact:</p>
+                  <p className="text-sm text-emerald-700 mt-2 font-medium">ops@mochiforge.local</p>
+                  <p className="text-sm text-emerald-700">+1 (555) 010-2448</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
