@@ -13,11 +13,13 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   Home, BarChart3, AlertTriangle, History,
-  Bell, Settings, Sprout, MessageCircle, Bot,
+  Settings, Sprout, MessageCircle, Bot,
   Sparkles, Send, X, Minimize2, Maximize2
 } from 'lucide-react';
 import { DashboardPage } from './Pages/DashboardPage';
 import { chatWithAI, generateSessionId } from './services/aiAssistantService';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { SettingsPanel } from './components/SettingsPanel';
 
 const greenhouseHero = new URL('./components/assests/greenhouse-hero.jpg', import.meta.url).href;
 
@@ -55,6 +57,7 @@ function PageLoader() {
 function App() {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [assistantFullscreen, setAssistantFullscreen] = useState(false);
@@ -171,10 +174,10 @@ function App() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:scale-105">
-              <Bell className="w-5 h-5" />
-            </button>
-            <button className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:scale-105">
+            <button 
+              onClick={() => setSettingsOpen(true)}
+              className="p-2.5 hover:bg-green-100/50 rounded-xl transition-all duration-200 text-green-700 hover:scale-105"
+            >
               <Settings className="w-5 h-5" />
             </button>
           </div>
@@ -439,8 +442,20 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* Settings Panel */}
+      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
 
-export default App;
+// Wrap the entire app with ThemeProvider
+const AppWithTheme: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+};
+
+export default AppWithTheme;
