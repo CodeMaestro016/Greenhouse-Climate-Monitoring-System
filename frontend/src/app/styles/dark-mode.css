@@ -1,0 +1,426 @@
+/* Dark Mode Styles for Greenhouse Monitoring System */
+
+/* Root level dark mode variables */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --accent-green: #10b981;
+  --accent-emerald: #059669;
+  --accent-lime: #84cc16;
+}
+
+/* Background and base styles */
+.dark .min-h-screen {
+  background-color: var(--bg-primary);
+}
+
+.dark .fixed.inset-0.z-0 {
+  background: linear-gradient(to bottom right, #0f172a, #1e293b, #0f172a);
+}
+
+.dark .fixed.inset-0.z-0 img {
+  opacity: 10;
+}
+
+/* Header styles */
+.dark header {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: var(--border-primary);
+}
+
+.dark header h1 {
+  color: var(--text-primary);
+}
+
+.dark header p {
+  color: var(--accent-green);
+}
+
+/* Sidebar styles */
+.dark aside {
+  background: rgba(15, 23, 42, 0.8);
+  border-color: var(--border-primary);
+}
+
+.dark nav button {
+  color: var(--text-secondary);
+}
+
+.dark nav button:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dark nav button.active {
+  background: linear-gradient(to right, var(--accent-green), var(--accent-emerald));
+  color: white;
+}
+
+/* Main content styles */
+.dark main {
+  background-color: var(--bg-primary);
+}
+
+.dark .bg-white\/80 {
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.dark .rounded-2xl {
+  background-color: var(--bg-card);
+  border-color: var(--border-primary);
+}
+
+/* Card and component styles */
+.dark .bg-white {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .bg-gray-50 {
+  background-color: var(--bg-secondary) !important;
+}
+
+.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+
+.dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.dark .bg-orange-50 {
+  background-color: rgba(249, 115, 22, 0.1) !important;
+}
+
+.dark .bg-yellow-50 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Text styles */
+.dark .text-gray-800 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-gray-700 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .text-gray-600 {
+  color: var(--text-tertiary) !important;
+}
+
+.dark .text-gray-500 {
+  color: var(--text-tertiary) !important;
+}
+
+.dark .text-gray-400 {
+  color: var(--text-tertiary) !important;
+}
+
+.dark .text-green-700 {
+  color: var(--accent-green) !important;
+}
+
+.dark .text-emerald-700 {
+  color: var(--accent-emerald) !important;
+}
+
+/* Border styles */
+.dark .border-gray-200 {
+  border-color: var(--border-primary) !important;
+}
+
+.dark .border-gray-300 {
+  border-color: var(--border-secondary) !important;
+}
+
+.dark .border-green-200 {
+  border-color: var(--accent-green) !important;
+}
+
+.dark .border-emerald-100 {
+  border-color: var(--accent-emerald) !important;
+}
+
+/* Hover states */
+.dark .hover\:bg-gray-100:hover {
+  background-color: var(--bg-hover) !important;
+}
+
+.dark .hover\:bg-green-100\/50:hover {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  background-color: var(--bg-secondary) !important;
+}
+
+.dark .hover\:bg-emerald-100:hover {
+  background-color: rgba(16, 185, 129, 0.2) !important;
+}
+
+.dark .hover\:text-green-700:hover {
+  color: var(--accent-green) !important;
+}
+
+/* AI Assistant styles */
+.dark .border-emerald-100 {
+  border-color: var(--accent-emerald) !important;
+}
+
+.dark .bg-gradient-to-b.from-white.to-gray-50 {
+  background: linear-gradient(to bottom, var(--bg-card), var(--bg-secondary)) !important;
+}
+
+.dark .bg-white.border.border-gray-200 {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-primary) !important;
+}
+
+.dark .bg-emerald-600 {
+  background-color: var(--accent-green) !important;
+}
+
+.dark .border-gray-200 {
+  border-color: var(--border-primary) !important;
+}
+
+.dark .bg-gray-100 {
+  background-color: var(--bg-tertiary) !important;
+}
+
+/* Button styles */
+.dark button {
+  color: var(--text-secondary);
+}
+
+.dark .text-white {
+  color: white !important;
+}
+
+/* Input styles */
+.dark input {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+.dark input::placeholder {
+  color: var(--text-tertiary) !important;
+}
+
+/* Select styles */
+.dark select {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Alert and status colors */
+.dark .text-red-600 {
+  color: #ef4444 !important;
+}
+
+.dark .text-orange-600 {
+  color: #f97316 !important;
+}
+
+.dark .text-yellow-600 {
+  color: #eab308 !important;
+}
+
+.dark .text-blue-600 {
+  color: #3b82f6 !important;
+}
+
+.dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.dark .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.1) !important;
+}
+
+.dark .bg-yellow-100 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+}
+
+.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Chart styles */
+.dark .recharts-wrapper {
+  background-color: var(--bg-card) !important;
+}
+
+.dark .recharts-cartesian-grid line {
+  stroke: var(--border-primary) !important;
+}
+
+.dark .recharts-xAxis line,
+.dark .recharts-yAxis line {
+  stroke: var(--border-primary) !important;
+}
+
+.dark .recharts-xAxis text,
+.dark .recharts-yAxis text {
+  fill: var(--text-tertiary) !important;
+}
+
+.dark .recharts-legend-item text {
+  fill: var(--text-secondary) !important;
+}
+
+/* Loading spinner */
+.dark .animate-spin {
+  border-color: var(--text-tertiary);
+  border-top-color: var(--accent-green);
+}
+
+/* Scrollbar styles */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Mobile navigation */
+.dark .lg\:hidden.fixed.bottom-0 {
+  background: rgba(15, 23, 42, 0.9);
+  border-color: var(--border-primary);
+}
+
+/* Glass morphism effect in dark mode */
+.dark .glass-morphism {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Hero gradient in dark mode */
+.dark .hero-gradient {
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-emerald), var(--accent-lime));
+}
+
+/* Shadow effects */
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+.dark .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* Ring and focus styles */
+.dark .ring-2 {
+  --tw-ring-color: var(--accent-green);
+}
+
+.dark .focus\:ring-emerald-500:focus {
+  --tw-ring-color: var(--accent-green);
+}
+
+/* Status indicators */
+.dark .from-red-50.to-red-100\/60 {
+  background: linear-gradient(to bottom, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.06));
+}
+
+.dark .from-orange-50.to-orange-100\/60 {
+  background: linear-gradient(to bottom, rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.06));
+}
+
+.dark .from-yellow-50.to-yellow-100\/60 {
+  background: linear-gradient(to bottom, rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.06));
+}
+
+.dark .from-blue-50.to-blue-100\/60 {
+  background: linear-gradient(to bottom, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.06));
+}
+
+/* Badge styles */
+.dark .bg-emerald-100.text-emerald-700 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  color: var(--accent-green) !important;
+}
+
+.dark .bg-red-100.text-red-700 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+}
+
+.dark .bg-orange-100.text-orange-700 {
+  background-color: rgba(249, 115, 22, 0.1) !important;
+  color: #f97316 !important;
+}
+
+.dark .bg-yellow-100.text-yellow-700 {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+  color: #eab308 !important;
+}
+
+.dark .bg-blue-100.text-blue-700 {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: #3b82f6 !important;
+}
+
+/* Tooltip styles */
+.dark .recharts-tooltip-wrapper {
+  background-color: var(--bg-card) !important;
+  border: 1px solid var(--border-primary) !important;
+}
+
+.dark .recharts-tooltip-content {
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Table styles */
+.dark table {
+  color: var(--text-primary);
+}
+
+.dark th {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-primary);
+}
+
+.dark td {
+  border-color: var(--border-primary);
+}
+
+.dark tbody tr:hover {
+  background-color: var(--bg-hover);
+}
