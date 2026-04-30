@@ -580,7 +580,7 @@ export function AnalyticsPage() {
         })()}
 
         <h3 className="mb-3 text-lg font-semibold text-gray-800">Deep-Dive Charts</h3>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
           {/* Trend chart */}
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -668,6 +668,54 @@ export function AnalyticsPage() {
                   <Line type="monotone" dataKey="value"        name="Reading"         stroke="#1d4ed8" strokeWidth={2}  dot={false} isAnimationActive={false} />
                   <Line type="monotone" dataKey="anomalyValue" name="Needs attention"  stroke="#dc2626" strokeWidth={0}  dot={{ r: 4, fill: '#dc2626' }} isAnimationActive={false} />
                 </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Correlation chart */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-sky-600" />
+                <h4 className="text-base font-semibold text-gray-800">Sensor Correlation</h4>
+              </div>
+            </div>
+
+            {correlationData && (
+              <>
+                <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm">
+                  <div className="rounded-md bg-gray-100 px-2 py-2">
+                    <p className="text-gray-500">Correlation</p>
+                    <p className={`font-semibold ${
+                      Math.abs(correlationData.correlation) > 0.7 ? 'text-rose-600' :
+                      Math.abs(correlationData.correlation) > 0.35 ? 'text-amber-600' :
+                      'text-emerald-600'
+                    }`}>
+                      {correlationData.correlation.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-gray-100 px-2 py-2">
+                    <p className="text-gray-500">Fields</p>
+                    <p className="text-xs font-semibold text-gray-800">
+                      {getFieldLabel(correlationData.field1)} vs<br />{getFieldLabel(correlationData.field2)}
+                    </p>
+                  </div>
+                </div>
+                <div className="mb-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                  {correlationData.interpretation}
+                </div>
+              </>
+            )}
+
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis type="number" dataKey="x" stroke="#6b7280" name={correlationData?.field1 ? getFieldLabel(correlationData.field1) : 'Field 1'} />
+                  <YAxis type="number" dataKey="y" stroke="#6b7280" name={correlationData?.field2 ? getFieldLabel(correlationData.field2) : 'Field 2'} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter name="Data Points" data={correlationData?.data || []} fill="#8b5cf6" />
+                </ScatterChart>
               </ResponsiveContainer>
             </div>
           </div>
