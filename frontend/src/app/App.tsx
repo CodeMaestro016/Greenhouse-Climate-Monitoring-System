@@ -20,7 +20,7 @@ import { DashboardPage } from './Pages/DashboardPage';
 import { chatWithAI, generateSessionId } from './services/aiAssistantService';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SettingsPanel } from './components/SettingsPanel';
-import { Footer } from './components/Footer';
+import { Footer } from "./components/Footer";
 
 const greenhouseHero = new URL('./components/assests/greenhouse-hero.jpg', import.meta.url).href;
 
