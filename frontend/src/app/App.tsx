@@ -20,6 +20,7 @@ import { DashboardPage } from './Pages/DashboardPage';
 import { chatWithAI, generateSessionId } from './services/aiAssistantService';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SettingsPanel } from './components/SettingsPanel';
+import { Footer } from './components/Footer';
 
 const greenhouseHero = new URL('./components/assests/greenhouse-hero.jpg', import.meta.url).href;
 
@@ -271,9 +272,7 @@ function App() {
         </main>
       </div>
 
-      <footer className="relative z-10 glass-morphism border-t border-green-200/20 px-6 py-3 text-center text-xs text-green-800/70 backdrop-blur-md">
-        <p>Greenhouse Climate Monitoring System • Mochiforge (PVT) LTD</p>
-      </footer>
+      <Footer />
 
       {/* AI Assistant button */}
       <div className="fixed bottom-6 right-6 z-50">
