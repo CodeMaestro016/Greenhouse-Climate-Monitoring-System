@@ -20,6 +20,7 @@ import { DashboardPage } from './Pages/DashboardPage';
 import { chatWithAI, generateSessionId } from './services/aiAssistantService';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SettingsPanel } from './components/SettingsPanel';
+import { Footer } from "./components/Footer";
 
 const greenhouseHero = new URL('./components/assests/greenhouse-hero.jpg', import.meta.url).href;
 
@@ -270,6 +271,8 @@ function App() {
           </div>
         </main>
       </div>
+
+      <Footer />
 
       {/* AI Assistant button */}
       <div className="fixed bottom-6 right-6 z-50">

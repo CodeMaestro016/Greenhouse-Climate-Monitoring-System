@@ -535,7 +535,7 @@ export function HistoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-700">
-                  {['Sensor ID','Date','Time','Humidity','Soil Moisture','Light (lux)','Temperature','Air Quality (PPM)'].map((h) => (
+                  {['Sensor ID','Date','Time','Humidity (%)','Soil Moisture (%)','Light (lux)','Temperature (°C)','Air Quality (PPM)'].map((h) => (
                     <th key={h} className="sticky top-0 z-10 bg-white text-left py-3 px-3 font-semibold whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
