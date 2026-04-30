@@ -271,6 +271,10 @@ function App() {
         </main>
       </div>
 
+      <footer className="relative z-10 border-t border-green-200/20 bg-white/50 backdrop-blur-md px-6 py-3 text-center text-xs text-green-800/70">
+        <p>Greenhouse Climate Monitoring System • Mochiforge (PVT) LTD</p>
+      </footer>
+
       {/* AI Assistant button */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
