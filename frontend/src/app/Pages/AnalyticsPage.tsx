@@ -580,147 +580,175 @@ export function AnalyticsPage() {
         })()}
 
         <h3 className="mb-3 text-lg font-semibold text-gray-800">Deep-Dive Charts</h3>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
 
-          {/* Trend chart */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ChartLine className="h-5 w-5 text-emerald-700" />
-                <h4 className="text-base font-semibold text-gray-800">Trend over time</h4>
-              </div>
-              <select value={trendField} onChange={e => setTrendField(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-sm">
-                {FIELD_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
-            </div>
+  {/* ───── Trend Chart ───── */}
+  <div className="rounded-2xl border border-gray-100 bg-white/90 p-5 shadow-lg shadow-gray-100 transition hover:-translate-y-1 hover:shadow-xl">
 
-
-            {trendData && (
-              <div className="mb-3 grid grid-cols-3 gap-2 text-center text-sm">
-                {[
-                  { label: 'Trend',        val: TREND_LABELS[trendData.trend] },
-                  { label: 'Change speed', val: trendData.slope.toFixed(2)    },
-                  { label: 'What it means', val: getActionHint(trendData.field, trendData.latestValue) },
-                ].map(({ label, val }) => (
-                  <div key={label} className="rounded-md bg-gray-100 px-2 py-2">
-                    <p className="text-gray-500">{label}</p>
-                    <p className="font-semibold text-gray-800">{val}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trendWithAverage}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="label" stroke="#6b7280" minTickGap={20} />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="value"         name="Reading"    stroke="#3b82f6" strokeWidth={3} dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="movingAverage" name="Moving avg"  stroke="#f97316" strokeWidth={3} dot={false} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Anomaly chart */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-rose-700" />
-                <h4 className="text-base font-semibold text-gray-800">Unusual readings</h4>
-              </div>
-              <select value={mlField} onChange={e => setMlField(e.target.value)}
-                className="rounded-md border border-gray-300 px-2 py-1 text-sm">
-                {FIELD_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-              </select>
-            </div>
-
-            {mlData && (
-              <>
-                <div className="mb-2 grid grid-cols-2 gap-2 text-center text-sm">
-                  <div className="rounded-md bg-gray-100 px-2 py-2">
-                    <p className="text-gray-500">Method</p>
-                    <p className="font-semibold text-gray-800">{mlData.method}</p>
-                  </div>
-                  <div className="rounded-md bg-gray-100 px-2 py-2">
-                    <p className="text-gray-500">Unusual</p>
-                    <p className="font-semibold text-gray-800">{mlData.anomalyCount} / {mlData.count}</p>
-                  </div>
-                </div>
-                <div className="mb-2 rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-800">
-                  {getAnomalyAction(mlData.field, mlData.anomalyCount, mlData.count)}
-                </div>
-              </>
-            )}
-
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={mlChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="label" stroke="#6b7280" minTickGap={20} />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="value"        name="Reading"         stroke="#1d4ed8" strokeWidth={2}  dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="anomalyValue" name="Needs attention"  stroke="#dc2626" strokeWidth={0}  dot={{ r: 4, fill: '#dc2626' }} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Correlation chart */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Link2 className="h-5 w-5 text-sky-600" />
-                <h4 className="text-base font-semibold text-gray-800">Sensor Correlation</h4>
-              </div>
-            </div>
-
-            {correlationData && (
-              <>
-                <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm">
-                  <div className="rounded-md bg-gray-100 px-2 py-2">
-                    <p className="text-gray-500">Correlation</p>
-                    <p className={`font-semibold ${
-                      Math.abs(correlationData.correlation) > 0.7 ? 'text-rose-600' :
-                      Math.abs(correlationData.correlation) > 0.35 ? 'text-amber-600' :
-                      'text-emerald-600'
-                    }`}>
-                      {correlationData.correlation.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-gray-100 px-2 py-2">
-                    <p className="text-gray-500">Fields</p>
-                    <p className="text-xs font-semibold text-gray-800">
-                      {getFieldLabel(correlationData.field1)} vs<br />{getFieldLabel(correlationData.field2)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mb-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                  {correlationData.interpretation}
-                </div>
-              </>
-            )}
-
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis type="number" dataKey="x" stroke="#6b7280" name={correlationData?.field1 ? getFieldLabel(correlationData.field1) : 'Field 1'} />
-                  <YAxis type="number" dataKey="y" stroke="#6b7280" name={correlationData?.field2 ? getFieldLabel(correlationData.field2) : 'Field 2'} />
-                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                  <Scatter name="Data Points" data={correlationData?.data || []} fill="#8b5cf6" />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
+    <div className="mb-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-emerald-100 p-2">
+          <ChartLine className="h-5 w-5 text-emerald-700" />
         </div>
+        <div>
+          <h4 className="text-base font-bold text-gray-800">Trend over time</h4>
+          <p className="text-xs text-gray-500">Reading pattern with moving average</p>
+        </div>
+      </div>
+
+      <select
+        value={trendField}
+        onChange={e => setTrendField(e.target.value)}
+        className="rounded-lg border border-gray-200 px-2 py-1 text-sm shadow-sm"
+      >
+        {FIELD_OPTIONS.map(f => (
+          <option key={f.value} value={f.value}>{f.label}</option>
+        ))}
+      </select>
+    </div>
+
+    {trendData && (
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center text-sm">
+        {[
+          { label: 'Trend', val: TREND_LABELS[trendData.trend] },
+          { label: 'Speed', val: trendData.slope.toFixed(2) },
+          { label: 'Action', val: getActionHint(trendData.field, trendData.latestValue) },
+        ].map(({ label, val }) => (
+          <div key={label} className="rounded-lg bg-gray-50 px-2 py-2">
+            <p className="text-gray-500 text-xs">{label}</p>
+            <p className="font-semibold text-gray-800">{val}</p>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={trendWithAverage}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="label" stroke="#6b7280" />
+          <YAxis stroke="#6b7280" />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} dot={false} />
+          <Line type="monotone" dataKey="movingAverage" stroke="#f97316" strokeWidth={3} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+
+  {/* ───── Anomaly Chart ───── */}
+  <div className="rounded-2xl border border-gray-100 bg-white/90 p-5 shadow-lg shadow-gray-100 transition hover:-translate-y-1 hover:shadow-xl">
+
+    <div className="mb-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-rose-100 p-2">
+          <Brain className="h-5 w-5 text-rose-700" />
+        </div>
+        <div>
+          <h4 className="text-base font-bold text-gray-800">Anomaly Detection</h4>
+          <p className="text-xs text-gray-500">ML detected unusual readings</p>
+        </div>
+      </div>
+
+      <select
+        value={mlField}
+        onChange={e => setMlField(e.target.value)}
+        className="rounded-lg border border-gray-200 px-2 py-1 text-sm shadow-sm"
+      >
+        {FIELD_OPTIONS.map(f => (
+          <option key={f.value} value={f.value}>{f.label}</option>
+        ))}
+      </select>
+    </div>
+
+    {mlData && (
+      <>
+        <div className="mb-2 flex justify-between text-sm">
+          <span className="text-gray-500">Method:</span>
+          <span className="font-semibold">{mlData.method}</span>
+        </div>
+
+        <div className="mb-2 flex justify-between text-sm">
+          <span className="text-gray-500">Anomalies:</span>
+          <span className="font-semibold text-rose-600">
+            {mlData.anomalyCount} / {mlData.count}
+          </span>
+        </div>
+
+        <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          {getAnomalyAction(mlData.field, mlData.anomalyCount, mlData.count)}
+        </div>
+      </>
+    )}
+
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={mlChartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="label" stroke="#6b7280" />
+          <YAxis stroke="#6b7280" />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="value" stroke="#1d4ed8" dot={false} />
+          <Line type="monotone" dataKey="anomalyValue"
+            stroke="#dc2626"
+            strokeWidth={0}
+            dot={{ r: 5, fill: '#dc2626' }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+
+  {/* ───── Correlation Chart ───── */}
+  <div className="rounded-2xl border border-gray-100 bg-white/90 p-5 shadow-lg shadow-gray-100 transition hover:-translate-y-1 hover:shadow-xl">
+
+    <div className="mb-4 flex items-center gap-3">
+      <div className="rounded-xl bg-sky-100 p-2">
+        <Link2 className="h-5 w-5 text-sky-700" />
+      </div>
+      <div>
+        <h4 className="text-base font-bold text-gray-800">Correlation</h4>
+        <p className="text-xs text-gray-500">Relationship between sensors</p>
+      </div>
+    </div>
+
+    {correlationData && (
+      <>
+        <div className="mb-3 flex justify-between text-sm">
+          <span className="text-gray-500">Correlation:</span>
+          <span className="font-semibold text-indigo-600">
+            {correlationData.correlation.toFixed(2)}
+          </span>
+        </div>
+
+        <div className="mb-3 text-xs text-gray-500">
+          {getFieldLabel(correlationData.field1)} vs {getFieldLabel(correlationData.field2)}
+        </div>
+
+        <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          {correlationData.interpretation}
+        </div>
+      </>
+    )}
+
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis type="number" dataKey="x" stroke="#6b7280" />
+          <YAxis type="number" dataKey="y" stroke="#6b7280" />
+          <Tooltip />
+          <Scatter data={correlationData?.data || []} fill="#8b5cf6" />
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  </div>
+
+</div>
 
       </section>
 
