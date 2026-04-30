@@ -215,3 +215,4 @@ export function DashboardAlerts({ onOpenAlert }: DashboardAlertsProps) {
     </div>
   );
 }
+

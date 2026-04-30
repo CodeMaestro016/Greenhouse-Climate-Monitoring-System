@@ -10,7 +10,6 @@ import {
   XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell 
 } from 'recharts';
 import { AlertReport } from './AlertReport';
-import { useAppStore, type AlertsPageAlert } from '../store/appStore';
 import { getAlertRecommendation, AlertRecommendation } from '../services/alertRecommendationService';
 
 // Alert interface matching backend schema
@@ -281,10 +280,8 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
   const [historySeverityFilter, setHistorySeverityFilter] = useState<string>('all');
   const [historyTimeFilter, setHistoryTimeFilter] = useState<'24h' | '48h' | '72h' | '7d' | '30d'>('24h');
   const [categoryTimeFilter, setCategoryTimeFilter] = useState<'24h' | '48h' | '72h' | '7d' | '30d'>('24h');
-  const alerts = useAppStore((state) => state.alertsPageAlerts);
-  const loading = useAppStore((state) => state.alertsPageLoading);
-  const setAlerts = useAppStore((state) => state.setAlertsPageAlerts);
-  const setLoading = useAppStore((state) => state.setAlertsPageLoading);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [recommendations, setRecommendations] = useState<{ [key: string]: AlertRecommendation }>({});
@@ -329,11 +326,10 @@ export function AlertsPage({ selectedAlertId }: AlertsPageProps) {
       }
 
       const data = await response.json();
-      const newAlerts = (data.data || (Array.isArray(data) ? data : [])) as AlertsPageAlert[];
-      const currentAlerts = useAppStore.getState().alertsPageAlerts;
+      const newAlerts = (data.data || (Array.isArray(data) ? data : [])) as Alert[];
 
-      if (alertsChanged(currentAlerts, newAlerts)) {
-        console.log(`Alerts updated: ${currentAlerts.length} -> ${newAlerts.length}`);
+      if (alertsChanged(alerts, newAlerts)) {
+        console.log(`Alerts updated: ${alerts.length} -> ${newAlerts.length}`);
         setAlerts(newAlerts);
       }
 
