@@ -1,10 +1,3 @@
-/**
- * AnalyticsPage.tsx - Farm Insights + Analysis Charts
- *
- * Top section  : Condition Summary cards (one per sensor reading) + Best Time to Act
- * Bottom section: Trend chart, Correlation chart, ML Anomaly chart
- */
-
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -23,6 +16,8 @@ type SensorRecord = {
   readings?: Partial<Record<Field, number | null>>;
   [key: string]: unknown;
 };
+
+type SensorValueSource = SensorRecord & Partial<Record<Field, number | null>>;
 
 type Field     = 'temperature' | 'humidity' | 'soil' | 'airppm' | 'light';
 type Direction = 'increasing' | 'decreasing' | 'stable';
@@ -111,9 +106,14 @@ const TREND_LABELS: Record<TrendResponse['trend'], string> = {
 
 function getFieldValues(records: SensorRecord[], field: Field): number[] {
   return records
-    .map(r => (r.readings?.[field] ?? (r as any)[field]) as unknown)
+    .map(r => readSensorValue(r, field))
     .filter((v): v is number => v !== null && v !== undefined && Number.isFinite(Number(v)))
     .map(Number);
+}
+
+function readSensorValue(record: SensorRecord, field: Field): number | null | undefined {
+  const source = record as SensorValueSource;
+  return source.readings?.[field] ?? source[field];
 }
 
 function getTrend(values: number[]): { arrow: '↑' | '↓' | '→'; direction: Direction } {
@@ -160,7 +160,7 @@ function buildTimeInsights(records: SensorRecord[]) {
     if (isNaN(ts.getTime())) continue;
     const h = ts.getHours();
     for (const f of FIELDS) {
-      const v = r.readings?.[f] ?? (r as any)[f];
+      const v = readSensorValue(r, f);
       if (v !== null && v !== undefined && Number.isFinite(Number(v)))
         buckets[f][h].push(Number(v));
     }
