@@ -15,6 +15,11 @@ Core capabilities:
 - AI assistant chat with conversation history and status checks
 - MQTT-to-MongoDB ingestion for streaming greenhouse data into the database
 
+
+## Frontend  
+### Home Page
+![Image](https://github.com/user-attachments/assets/c17f182b-54bf-423c-856a-fa38bb0c4f87)
+
 ## Project Structure
 
 ```text
